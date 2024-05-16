@@ -29,21 +29,12 @@
 #include <Wire.h>
 #include <myDebug.h>
 
-#define dbg_api  	0
-#define dbg_auto 	0
+#define dbg_api  		0
+#define dbg_auto 		0
+#define dbg_dispatch	0
+#define dbg_getcc		0
 
-
-
-bool SGTL5000::dispatchCC(uint8_t cc, uint8_t val)
-{
-	return true;
-}
-
-uint8_t SGTL5000::getCC(uint8_t cc)
-{
-	return 0;
-}
-
+#define DUMP_CCS		1
 
 
 
@@ -516,10 +507,6 @@ uint8_t SGTL5000::getCC(uint8_t cc)
 #define DAP_COEF_WR_A2_LSB			0x013A
 
 
-
-#define CACHE_REG(reg_num)			(*((unsigned short *) &m_reg_cache[reg_num]))
-
-
 bool SGTL5000::enable(void) {
 #if defined(KINETISL)
 	return enable(16000000); // SGTL as Master with 16MHz MCLK from Teensy LC
@@ -528,7 +515,8 @@ bool SGTL5000::enable(void) {
 #endif	
 }
 
-
+// peronal notes on where registers are used
+//
 // CHIP_ID						0x0000
 // CHIP_DIG_POWER				0x0002		enable
 // CHIP_CLK_CTRL				0x0004		enable
@@ -560,9 +548,7 @@ bool SGTL5000::enable(void) {
 // CHIP_ANA_TEST1				0x0038
 // CHIP_ANA_TEST2				0x003A
 // CHIP_SHORT_CTRL				0x003C		enable
-
 // gap to 0x100
-
 // DAP_CONTROL					0x0100					dapEnable()
 // DAP_PEQ						0x0102
 // DAP_BASS_ENHANCE				0x0104					enhanceBass(?), enhanceBassEnable()
@@ -593,7 +579,6 @@ bool SGTL5000::enable(void) {
 // DAP_COEF_WR_A1_LSB			0x0136
 // DAP_COEF_WR_A2_MSB			0x0138
 // DAP_COEF_WR_A2_LSB			0x013A
-
 // last register byte			0x013B
 
 // I have not dealt with AVC, or the Pararmetric EQ, and the DAP_MIXER
@@ -607,15 +592,15 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 	Wire.begin();
 	delay(5);
 
+	dumpCCValues("reset");
+
 	m_hp_muted = true;
 	m_lineout_muted = false;
-	m_dap_enable = 0;
-	m_eq_select = 0;
 	memset(m_band_value,0x2f,5);
 	memset(m_band_target,0x2f,5);
 	m_in_automation	= 0;
 
-	// Check if we are in Master Mode and if the Teensy had a reset:
+	// Check if we are in Master Mode and if the Teensy had a reset
 
 	unsigned int n = read(CHIP_I2S_CTRL);
 	if ( (extMCLK > 0) && (n == (0x0030 | (1<<7))) )
@@ -628,23 +613,13 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 		m_hp_muted = m_ana_ctrl & (1<<4) ? 1 : 0;
 		m_lineout_muted = m_ana_ctrl & (1<<8) ? 1 : 0;
 
-		unsigned short dap_control = read(DAP_CONTROL);
-		unsigned short sss_control = read(CHIP_SSS_CTRL);
-		if (!dap_control)
-			m_dap_enable = DAP_DISABLE;
-		else if ((sss_control & 0x0013) == 0x0013)
-			m_dap_enable = DAP_ENABLE_PRE;
-		else
-			m_dap_enable = DAP_ENABLE_POST;
-
-		m_eq_select = read(DAP_AUDIO_EQ);
-
-		for (unsigned short i=0; i<5; i++)
+		for (uint16_t i=0; i<5; i++)
 		{
 			m_band_value[i] = read(DAP_AUDIO_EQ_BASS_BAND0+i);
 			m_band_target[i] = m_band_value[i];
 		}
 
+		dumpCCValues("on enable() short return");
 		display(dbg_api,"SGTL5000::enable() returning from teensy Reset",0);
 		return true;
 	}
@@ -661,7 +636,13 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 	write(CHIP_LINE_OUT_CTRL, 	0x0F22);	// LO_VAGCNTRL=1.65V, OUT_CURRENT=0.54mA
 	write(CHIP_SHORT_CTRL, 		0x4446); 	// allow up to 125mA
 	write(CHIP_ANA_CTRL, 		0x0137);	// enable zero cross detectors
-		
+		//  0x100 = line out mute
+		// !0x040 = dac->headphone
+		//  0x020 = enable dac zero cross detector
+		//  0x010 = mute headphone output
+		//  0x004 = select line in input
+		//  0x002 = enable adc zero crossing
+		//  0x001 = mute analog volume
 	if (extMCLK > 0)
 	{
 		//SGTL is I2S Master
@@ -685,7 +666,7 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 			// power up: lineout, hp, adc, dac
 	}
 
-	write(CHIP_DIG_POWER, 	0x0073);		// power up all digital stuff
+	write(CHIP_DIG_POWER,	0x0073);		// power up all digital stuff
 	delay(400);
 	write(CHIP_LINE_OUT_VOL, 0x1D1D);		// default approx 1.3 volts peak-to-peak
 	
@@ -708,8 +689,19 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 	write(CHIP_SSS_CTRL, 	0x0010);	// ADC->I2S, I2S->DAC
 	write(CHIP_ADCDAC_CTRL, 0x0000);	// disable dac mute
 	write(CHIP_DAC_VOL, 	0x3C3C);	// digital gain, 0dB
-	write(CHIP_ANA_HP_CTRL, 0x7F7F);	// set volume (lowest level)
+
+	write(CHIP_ANA_HP_CTRL, 0x7F7F);	// hp volume to lowest level (0 on my scale)
+
 	write(CHIP_ANA_CTRL, 	0x0036);	// enable zero cross detectors
+		// !0x100 = unmute line out
+		// !0x040 = dac->headphone
+		//  0x020 = enable zero cross detector
+		//  0x010 = mute headphone output
+		//  0x004 = select line input
+		//  0x002 = enable adc zero crossing
+		// !0x001 = unmute analog (line in) volume
+
+	dumpCCValues("at end of enable()");
 
 	display(dbg_api,"SGTL5000::enable() finished",0);
 	return true;
@@ -717,9 +709,9 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 
 
 
-unsigned short SGTL5000::read(unsigned short reg_num)
+uint16_t SGTL5000::read(uint16_t reg_num)
 {
-	unsigned short val;
+	uint16_t val;
 	Wire.beginTransmission(m_i2c_addr);
 	Wire.write(reg_num >> 8);
 	Wire.write(reg_num);
@@ -738,7 +730,7 @@ unsigned short SGTL5000::read(unsigned short reg_num)
 	return val;
 }
 
-bool SGTL5000::write(unsigned short reg_num, unsigned short val)
+bool SGTL5000::write(uint16_t reg_num, uint16_t val)
 {
 	Wire.beginTransmission(m_i2c_addr);
 	Wire.write(reg_num >> 8);
@@ -755,9 +747,9 @@ bool SGTL5000::write(unsigned short reg_num, unsigned short val)
 	return true;
 }
 
-bool SGTL5000::modify(unsigned short reg_num, unsigned short val, unsigned short mask)
+bool SGTL5000::modify(uint16_t reg_num, uint16_t val, uint16_t mask)
 {
-	unsigned short cur = read(reg_num);
+	uint16_t cur = read(reg_num);
 	cur &= ~mask;
 	cur |= val;
 	if (!write(reg_num,cur)) return false;
@@ -776,11 +768,12 @@ bool SGTL5000::setDefaultGains()
 	proc_entry();
 
 	bool retval =
-		setMicGain(3) &&			// 40db (maximum)
-		setLineInLevel(5) &&		// 7.5db (1.33 Volts p-p measured)
+		setMicGain(1) &&			// 20db
+		setLineInLevel(7) &&		// reset default = 11db (0.94 Volts p-p measured)
 		setMuteHeadphone(0) &&
 		setMuteLineOut(0) &&
-		setHeadphoneVolume(90);		// -3.5db
+		setLineOutLevel(13) &&
+		setHeadphoneVolume(97);		// reset default
 
 	proc_leave();
 	return retval;
@@ -790,10 +783,16 @@ bool SGTL5000::setDefaultGains()
 bool SGTL5000::setInput(uint8_t val)
 {
 	display(dbg_api,"SGTL5000::setInput(%d)",val);
-	if (val == AUDIO_INPUT_MIC)
+	if (val == SGTL_INPUT_MIC)			// 1 = AUDIO_INPUT_MIC
 		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<2)); // enable mic
-	else // if (n == AUDIO_INPUT_LINEIN)
+	else // if (n == SGTL_INPUT_LINEIN)	// 0 = AUDIO_INPUT_LINEIN
 		return write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<2)); // enable linein
+}
+uint8_t SGTL5000::getInput()
+{
+	return (m_ana_ctrl & (1<<2)) ?
+		SGTL_INPUT_LINEIN :
+		SGTL_INPUT_MIC;
 }
 
 
@@ -802,11 +801,15 @@ bool SGTL5000::setMicGain(uint8_t val)
 	display(dbg_api,"SGTL5000::setMicGain(%d)",val);
 	return write(CHIP_MIC_CTRL, 0x0170 | val);
 		// 0x070 = max 3.0V Mic Bias voltage
-		// 0x100 = BIAS Reister 2.0 kOhm
+		// 0x100 = BIAS Reaistor 2.0 kOhm
+}
+uint8_t SGTL5000::getMicGain()
+{
+	return read(CHIP_MIC_CTRL) & 0x3;
 }
 
 
-bool SGTL5000::setLineInLevel(uint8_t left, uint8_t right)
+bool SGTL5000::setLineInLevelLeft(uint8_t val)
 	// Actual measured full-scale peak-to-peak sine wave input for max signal
 	//  0: 3.12 Volts p-p
 	//  1: 2.63 Volts p-p
@@ -825,44 +828,59 @@ bool SGTL5000::setLineInLevel(uint8_t left, uint8_t right)
 	// 14: 0.29 Volts p-p
 	// 15: 0.24 Volts p-p
 {
-	display(dbg_api,"SGTL5000::setLineInLevel(%d,%d)",left,right);
-	if (left > 15) left = 15;
-	if (right > 15) right = 15;
-	return write(CHIP_ANA_ADC_CTRL, (left << 4) | right);
+	display(dbg_api,"SGTL5000::setLineInLevelLeft(%d)",val);
+	if (val > 15) val = 15;
+	return modify(CHIP_ANA_ADC_CTRL, val, 0xf);
+}
+bool SGTL5000::setLineInLevelRight(uint8_t val)
+{
+	display(dbg_api,"SGTL5000::setLineInLevelRight(%d)",val);
+	if (val > 15) val = 15;
+	return modify(CHIP_ANA_ADC_CTRL, val << 4, 0xf << 4);
+}
+uint8_t SGTL5000::getLineInLevelLeft()
+{
+	return read(CHIP_ANA_ADC_CTRL) & 0xf;
+}
+uint8_t SGTL5000::getLineInLevelRight()
+{
+	return (read(CHIP_ANA_ADC_CTRL) & 0xf0) >> 4;
 }
 
 
 
-
-bool SGTL5000::setDacVolume(uint8_t val)
-	// val = 0..126 in (0 to -63db in 0.5db steps), 127 mutes
-	// my midi 7 bit implmentation misses full range of
-	// 0..180 =0 to -90db available on chip
+bool SGTL5000::setDacVolumeLeft(uint8_t val)
 {
-	display(dbg_api,"SGTL5000::setDacVolume(%d)",val);
-	unsigned short adcdac = read(CHIP_ADCDAC_CTRL);
-	unsigned short dac_mute = adcdac & (3 << 2);
-		// pull the two DAC_MUTE bits out of CHIP_ADCDAC_CTRL
-	unsigned short should_mute = val == 127 ? 0 : (3 << 2);
+	display(dbg_api,"SGTL5000::setDacVolumeLeft(%d)",val);
+	uint16_t adcdac = read(CHIP_ADCDAC_CTRL);
+	uint16_t dac_mute = adcdac & (1 << 2);
+		// pull the left DAC_MUTE bit out of CHIP_ADCDAC_CTRL
+	uint16_t should_mute = val == 127 ? 0 : 1 << 2;
 	if (dac_mute != should_mute)
-		if (!modify(CHIP_ADCDAC_CTRL,should_mute,3<<2))
-			return false;
-	if (val == 127) val = 0xFC;	// mute value
-	return modify(CHIP_DAC_VOL,(val<<8) | val,65535);
-}
-bool SGTL5000::setDacVolume(uint8_t left, uint8_t right)
-{
-	display(dbg_api,"SGTL5000::setDacVolume(%d,%d)",left,right);
-	unsigned short adcdac = read(CHIP_ADCDAC_CTRL);
-	unsigned short dac_mute = adcdac & (3 << 2);
-		// pull the two DAC_MUTE bits out of CHIP_ADCDAC_CTRL
-	unsigned short should_mute = (
-		(right == 127 ? 0 : 2) |
-		(left  == 127 ? 0 : 1) ) << 2;
-	if (dac_mute != should_mute) 
 		modify(CHIP_ADCDAC_CTRL,should_mute,1<<2);
-	return modify(CHIP_DAC_VOL,(right<<8) | left,65535);
+	return modify(CHIP_DAC_VOL,val,0xff);
 }
+bool SGTL5000::setDacVolumeRight(uint8_t val)
+{
+	display(dbg_api,"SGTL5000::setDacVolumeRight(%d)",val);
+	uint16_t adcdac = read(CHIP_ADCDAC_CTRL);
+	uint16_t dac_mute = adcdac & (2 << 2);
+		// pull the right DAC_MUTE bit out of CHIP_ADCDAC_CTRL
+	uint16_t should_mute = val == 127 ? 0 : 2 << 2;
+	if (dac_mute != should_mute)
+		modify(CHIP_ADCDAC_CTRL,should_mute,2<<2);
+	return modify(CHIP_DAC_VOL,val<<8,0xff00);
+}
+uint8_t SGTL5000::getDacVolumeLeft()
+{
+	return read(CHIP_DAC_VOL) & 0xff;
+}
+uint8_t SGTL5000::getDacVolumeRight()
+{
+	return (read(CHIP_DAC_VOL) >> 8) & 0xff;
+}
+
+
 bool SGTL5000::setDacVolumeRamp(uint8_t val)
 {
 	display(dbg_api,"SGTL5000::setDacVolumeRamp(%d)",val);
@@ -872,12 +890,21 @@ bool SGTL5000::setDacVolumeRamp(uint8_t val)
 		return modify(CHIP_ADCDAC_CTRL, 0x200, 0x300);
 	return modify(CHIP_ADCDAC_CTRL, 0x300, 0x300);
 }
+uint8_t SGTL5000::getDacVolumeRamp()
+{
+	uint16_t vol = read(CHIP_ADCDAC_CTRL) & 0x300;
+	return
+		vol == 0x300 ? DAC_VOLUME_RAMP_DISABLE :
+		vol == 0x200 ? DAC_VOLUME_RAMP_LINEAR :
+		DAC_VOLUME_RAMP_NORMAL;
+}
 
 
-unsigned short SGTL5000::setLineOutLevel(uint8_t val)
+
+bool SGTL5000::setLineOutLevelLeft(uint8_t val)
 	// CHIP_LINE_OUT_VOL
 	//  Actual measured full-scale peak-to-peak sine wave output voltage:
-	//  0-12: output has clipping		val
+	//  0-12: output has clipping		val  19..31
 	//  13: 3.16 Volts p-p				18
 	//  14: 2.98 Volts p-p				17
 	//  15: 2.83 Volts p-p              16
@@ -898,7 +925,9 @@ unsigned short SGTL5000::setLineOutLevel(uint8_t val)
 	//  30: 1.22 Volts p-p              1
 	//  31: 1.16 Volts p-p              0
 	//
-	// prh note: the register accepts 5 bits (0..63)
+	// note: the register accepts 5 bits (0..63)
+	// note: the reset default is 27 on my scale, preumably about 5v p-p
+	//
 	// apparently paul determined that values less than 13
 	// and over 31 are not useful.
 	//
@@ -907,77 +936,100 @@ unsigned short SGTL5000::setLineOutLevel(uint8_t val)
 	//      he must have been referring to his measured value of 1.29 volts,
 	//	    which corresponds to my parameter of (2)
 {
-	display(dbg_api,"SGTL5000::setLineOutLevel(%d)",val);
+	display(dbg_api,"SGTL5000::setLineOutLevelLeft(%d)",val);
 	proc_entry();
 
-	if (val == 0)
-		setMuteLineOut(1);
-	else if (m_lineout_muted)
+	if (val && m_lineout_muted)
 		setMuteLineOut(0);
-	if (val > 18) val = 18;
+	#if 1	// allow extended range
+		if (val > 31) val = 31;
+	#else
+		if (val > 18) val = 18;
+	#endif
+
 	val = 31-val;
 
 	proc_leave();
-	return modify(CHIP_LINE_OUT_VOL,(val<<8)|val,(31<<8)|31);
+	return modify(CHIP_LINE_OUT_VOL,val,31);
 }
-unsigned short SGTL5000::setLineOutLevel(uint8_t left, uint8_t right)
+bool SGTL5000::setLineOutLevelRight(uint8_t val)
 {
-	display(dbg_api,"SGTL5000::setLineOutLevel(%d,%d)",left,right);
+	display(dbg_api,"SGTL5000::setLineOutLevelRight(%d)",val);
 	proc_entry();
 
-	if (m_lineout_muted && (left || right))
+	if (val && m_lineout_muted)
 		setMuteLineOut(0);
-	if (left > 18) left = 18;
-	if (right > 18) right = 18;
-	left = 31 - left;
-	right = 31 - right;
+	#if 1	// allow extended range
+		if (val > 31) val = 31;
+	#else
+		if (val > 18) val = 18;
+	#endif
+	
+	val = 31-val;
 
 	proc_leave();
-	return modify(CHIP_LINE_OUT_VOL,(right<<8)|left,(31<<8)|31);
+	return modify(CHIP_LINE_OUT_VOL,val<<8,31<<8);
 }
-
-
+uint8_t SGTL5000::getLineOutLevelLeft()
+{
+	return 31-(read(CHIP_LINE_OUT_VOL) & 31);
+}
+uint8_t SGTL5000::getLineOutLevelRight()
+{
+	return 31 - ((read(CHIP_LINE_OUT_VOL) >> 8) & 31);
+}
 
 
 bool SGTL5000::setHeadphoneSelect(uint8_t val)
 {
 	display(dbg_api,"SGTL5000::setHeadphoneSelect(%d)",val);
-	if (val == HEADPHONE_LINEIN)	// bypass route LINE_IN to headphone
-		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<6));
-	else //  (val == HEADPHONE_NORMAL)	// route DAC to headphone
+	if (val == HEADPHONE_LINEIN)		// bypass route LINE_IN to headphone
 		return write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<6));
+	else // (val == HEADPHONE_NORMAL)	// route DAC to headphone
+		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<6));
 }
-bool SGTL5000::setHeadphoneVolume(uint8_t left, uint8_t right)	// 0..127
+uint8_t SGTL5000::getHeadphoneSelect()
 {
-	display(dbg_api,"SGTL5000::setHeadphoneVolume(%d,%d)",left,right);
+	return m_ana_ctrl & (1<<6) ?
+		HEADPHONE_LINEIN :
+		HEADPHONE_NORMAL;
+}
+
+
+bool SGTL5000::setHeadphoneVolumeLeft(uint8_t val)	// 0..127
+{
+	display(dbg_api,"SGTL5000::setHeadphoneVolumeLeft(%d)",val);
 	proc_entry();
 
-	if (m_hp_muted && (left || right))
+	if (val && m_hp_muted)
 		setMuteHeadphone(0);
-	if (left > 0x7f) left = 0x7f;
-	if (right > 0x7f) right = 0x7f;
-	unsigned short val = ((0x7f-right) << 8) | (0x7f - left);
-
-	proc_leave();
-	return write(CHIP_ANA_HP_CTRL, val);
-}
-bool SGTL5000::setHeadphoneVolume(uint8_t val)	// 0..127
-{
-	display(dbg_api,"SGTL5000::setLineOutLevel(%d)",val);
-	proc_entry();
-
 	if (val > 0x7f) val = 0x7f;
-	if (val == 0)
-		setMuteHeadphone(1);
-	else if (m_hp_muted)
-		setMuteHeadphone(0);
 	val = 0x7f - val;
-	val = val | (val<< 8);
 
 	proc_leave();
-	return write(CHIP_ANA_HP_CTRL, val);
+	return modify(CHIP_ANA_HP_CTRL, val, 0x7f);
 }
+bool SGTL5000::setHeadphoneVolumeRight(uint8_t val)	// 0..127
+{
+	display(dbg_api,"SGTL5000::setHeadphoneVolumeRight(%d)",val);
+	proc_entry();
 
+	if (val && m_hp_muted)
+		setMuteHeadphone(0);
+	if (val > 0x7f) val = 0x7f;
+	val = 0x7f - val;
+
+	proc_leave();
+	return modify(CHIP_ANA_HP_CTRL, val << 8, 0x7f << 8);
+}
+uint8_t SGTL5000::getHeadphoneVolumeLeft()
+{
+	return 0x7f-(read(CHIP_ANA_HP_CTRL) & 0x7f);
+}
+uint8_t SGTL5000::getHeadphoneVolumeRight()
+{
+	return 0x7f-((read(CHIP_ANA_HP_CTRL) >> 8) & 0x7f);
+}
 
 
 
@@ -990,6 +1042,10 @@ bool SGTL5000::setMuteHeadphone(uint8_t mute)
 		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<4));
 	m_hp_muted = mute;
 }
+uint8_t SGTL5000::getMuteHeadphone()
+{
+	return m_ana_ctrl & (1<<4) ? 1 : 0;
+}
 
 
 bool SGTL5000::setMuteLineOut(uint8_t mute)
@@ -1001,6 +1057,12 @@ bool SGTL5000::setMuteLineOut(uint8_t mute)
 		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<8));
 	m_lineout_muted = mute;
 }
+uint8_t SGTL5000::getMuteLineOut()
+{
+	return m_ana_ctrl & (1<<8) ? 1 : 0;
+}
+
+
 
 
 bool SGTL5000::setAdcHighPassFilter(uint8_t val)
@@ -1012,6 +1074,15 @@ bool SGTL5000::setAdcHighPassFilter(uint8_t val)
 		return modify(CHIP_ADCDAC_CTRL, 2, 3);
 	else // ADC_HIGH_PASS_ENABLE
 		return modify(CHIP_ADCDAC_CTRL, 0, 3);
+}
+uint8_t SGTL5000::getAdcHighPassFilter()
+{
+	uint16_t val = read(CHIP_ADCDAC_CTRL)  & 0x3;
+	if (val == 3)
+		return ADC_HIGH_PASS_DISABLE;
+	if (val == 2)
+		return ADC_HIGH_PASS_FREEZE;
+	return ADC_HIGH_PASS_ENABLE;
 }
 
 
@@ -1059,12 +1130,21 @@ bool SGTL5000::setDapEnable(uint8_t val)
 
 	setMuteHeadphone(save_hp_mute);
 	setMuteLineOut(save_lineout_mute);
-	if (result)
-		m_dap_enable = val;
 
 	proc_leave();
 	return result;
 }
+uint8_t SGTL5000::getDapEnable()
+{
+	uint16_t dap_control = read(DAP_CONTROL);
+	uint16_t sss_control = read(CHIP_SSS_CTRL);
+	if (!dap_control)
+		return DAP_DISABLE;
+	if ((sss_control & 0x0013) == 0x0013)
+		return DAP_ENABLE_PRE;
+	return DAP_ENABLE_POST;
+}
+
 
 
 
@@ -1121,14 +1201,14 @@ bool SGTL5000::setAutoVolumeControl(uint8_t maxGain, uint8_t lbiResponse, uint8_
 	lbiResponse &= 3;
 	hardLimit &= 1;
 
-	unsigned short thresh=(pow(10,threshold/20)*0.636)*pow(2,15);
+	uint16_t thresh=(pow(10,threshold/20)*0.636)*pow(2,15);
 	// uint8_t thresh=(pow(10,threshold/20)*0.636)*pow(2,15);
 		// A couple of observations about pauls original code.
 		// The DAP_AVC_THRESHOLD accepts a full 16 bit value.
 		// Pauls math appears to be correct to convert DB into a full range 16bit register value,
 		// However, Paul original code put it in a uint8_t that he sent to write().
 		// This means that for inputs of less than -48db, the results would be unpredictable.
-		// So, to start with I am changing it to an unsigned short.
+		// So, to start with I am changing it to an uint16_t.
 		// Doc:
 		//
 		//		Threshold is programmable. Use the following formula to calculate hex value:
@@ -1151,7 +1231,7 @@ bool SGTL5000::setAutoVolumeControl(uint8_t maxGain, uint8_t lbiResponse, uint8_
 
 	uint8_t att=(1-pow(10,-(attack/(20*44100))))*pow(2,19);
 	uint8_t dec=(1-pow(10,-(decay/(20*44100))))*pow(2,23);
-		// I am afraid to change these to unsigned shorts.
+		// I am afraid to change these to uint16_ts.
 		// The register values are 11 bits.
 		// Gonna leave it for now.
 
@@ -1179,15 +1259,28 @@ bool SGTL5000::setSurroundEnable(uint8_t val)
 {
 	display(dbg_api,"SGTL5000::setSurroundEnable(%d)",val);
 	if (val) val += 1;
-	return modify(DAP_SGTL_SURROUND, val & 0x3, 3);
+	return modify(DAP_SGTL_SURROUND, val & 0x3, 0x3);
 }
 
 bool SGTL5000::setSurroundWidth(uint8_t width)
 {
 	display(dbg_api,"SGTL5000::setSurroundWidth(%d)",width);
-	return modify(DAP_SGTL_SURROUND,(width&7)<<4,7<<4);
+	return modify(DAP_SGTL_SURROUND,(width&7)<<4,0x7<<4);
 }
 
+uint8_t SGTL5000::getSurroundEnable()
+{
+	uint16_t val = read(DAP_SGTL_SURROUND) & 0x3;
+	if (val == 3)
+		return SURROUND_STEREO;
+	if (val == 2)
+		return SURROUND_MONO;
+	return SURROUND_DISABLED;
+}
+uint8_t SGTL5000::getSurroundWidth()
+{
+	return (read(DAP_SGTL_SURROUND)>>4) & 0x7;
+}
 
 
 
@@ -1224,6 +1317,27 @@ bool SGTL5000::setBassEnhanceVolume(uint8_t val)
 	return modify(DAP_BASS_ENHANCE_CTRL, (0x3f-val)<<8, 0x3f<<8);
 }
 
+uint8_t SGTL5000::getEnableBassEnhance()
+{
+	return read(DAP_BASS_ENHANCE) & 1;
+}
+uint8_t SGTL5000::getEnableBassEnhanceCutoff()
+{
+	return (read(DAP_BASS_ENHANCE) >> 8) & 1;
+}
+uint8_t SGTL5000::getBassEnhanceCutoff()
+{
+	return (read(DAP_BASS_ENHANCE) >> 4) & 0x7;
+}
+uint8_t SGTL5000::getBassEnhanceBoost()
+{
+	return 0x7f - (read(DAP_BASS_ENHANCE_CTRL) & 0x7f);
+}
+uint8_t SGTL5000::getBassEnhanceVolume()
+{
+	return 0x3f-((read(DAP_BASS_ENHANCE_CTRL) >> 8) & 0x3f);
+}
+
 
 
 
@@ -1240,10 +1354,11 @@ bool SGTL5000::setEqSelect(uint8_t val)
 	// 3 = GEQ (5 band graphic EQ)
 {
 	display(dbg_api,"SGTL5000::setEqSelect(%d)",val);
-	bool rslt = modify(DAP_AUDIO_EQ,val & 3 ,3);
-	if (rslt)
-		m_eq_select = val;
-	return rslt;
+	return modify(DAP_AUDIO_EQ,val & 0x3 , 0x3);
+}
+uint8_t SGTL5000::getEqSelect()
+{
+	return read(DAP_AUDIO_EQ) & 0x3;
 }
 
 
@@ -1278,6 +1393,11 @@ bool SGTL5000::setEqBand(uint8_t band_num, uint8_t val)	// 0..95 (0x5F)
 	proc_leave();
 	return 1;
 }
+uint8_t SGTL5000::getEqBand(uint8_t band_num)
+{
+	return read(DAP_AUDIO_EQ_BASS_BAND0+(band_num*2)) & 0x5f;
+}
+
 
 
 void SGTL5000::handleEqAutomation(uint8_t band_num)
@@ -1334,7 +1454,7 @@ void SGTL5000::loop()
 // EQ(1) = Complicated PEQ (Parameteriszed EQ) methods
 // Not currently supported via MIDI interface
 
-unsigned short SGTL5000::eqFilterCount(uint8_t n) // valid to n&7, 0 thru 7 filters enabled.
+uint16_t SGTL5000::eqFilterCount(uint8_t n) // valid to n&7, 0 thru 7 filters enabled.
 {
 	return modify(DAP_PEQ,(n&7),7);
 }
@@ -1464,6 +1584,238 @@ void SGTL5000::calcBiquad(uint8_t filtertype, float fC, float dB_Gain, float Q, 
 	a2 /=a0;
 	*coef++ = (int)(a2+0.499);
 }
+
+
+//-------------------------------------------------
+// MIDI API
+//-------------------------------------------------
+
+bool SGTL5000::writeOnlyCC(uint8_t cc)
+{
+	if (cc == SGTL_CC_SET_DEFAULT_GAINS ||
+		cc == SGTL_CC_LINEIN_LEVEL ||
+		cc == SGTL_CC_DAC_VOLUME ||
+		cc == SGTL_CC_LINEOUT_LEVEL ||
+		cc == SGTL_CC_HP_VOLUME)
+		return true;
+	return false;
+}
+
+
+void SGTL5000::dumpCCValues(const char *where)
+{
+	#if DUMP_CCS
+		display(0,"dumpCCValues(%s)",where);
+		proc_entry();
+		for (uint8_t cc=SGTL_CC_BASE; cc<=SGTL_CC_MAX; cc++)
+		{
+			if (!writeOnlyCC(cc))
+				getCC(cc);
+			else if (1)
+				display(0,"",0);
+		}
+		proc_leave();
+	#endif
+}
+
+
+
+uint8_t SGTL5000::getCCMax(uint8_t cc)
+{
+	// 255 returned for unknown or writeOnly cc's
+
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: return 255;
+		case SGTL_CC_INPUT_SELECT			: return 1;
+		case SGTL_CC_MIC_GAIN_				: return 3;
+		case SGTL_CC_LINEIN_LEVEL			: return 255;
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: return 15;
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return 15;
+		case SGTL_CC_DAC_VOLUME				: return 255;
+		case SGTL_CC_DAC_VOLUME_LEFT		: return 127;
+		case SGTL_CC_DAC_VOLUME_RIGHT		: return 127;
+		case SGTL_CC_DAC_VOLUME_RAMP		: return 2;
+		case SGTL_CC_LINEOUT_LEVEL			: return 255;
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return 31;
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return 31;
+		case SGTL_CC_HP_SELECT				: return 1;
+		case SGTL_CC_HP_VOLUME				: return 255;
+		case SGTL_CC_HP_VOLUME_LEFT			: return 127;
+		case SGTL_CC_HP_VOLUME_RIGHT		: return 127;
+		case SGTL_CC_MUTE_HP				: return 1;
+		case SGTL_CC_MUTE_LINEOUT			: return 1;
+		case SGTL_CC_ADC_HIGH_PASS			: return 2;
+		case SGTL_CC_DAP_ENABLE				: return 2;
+		case SGTL_CC_SURROUND_ENABLE		: return 2;
+		case SGTL_CC_SURROUND_WIDTH			: return 7;
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: return 1;
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: return 1;
+		case SGTL_CC_BASS_CUTOFF_FREQ		: return 6;
+		case SGTL_CC_BASS_BOOST				: return 127;
+		case SGTL_CC_BASS_VOLUME			: return 0x3f;
+		case SGTL_CC_EQ_SELECT				: return 3;
+		case SGTL_CC_EQ_BAND0_BASS			: return 0x5f;
+		case SGTL_CC_EQ_BAND1				: return 0x5f;
+		case SGTL_CC_EQ_BAND2				: return 0x5f;
+		case SGTL_CC_EQ_BAND3				: return 0x5f;
+		case SGTL_CC_EQ_BAND4_TREBLE		: return 0x5f;
+	}
+	return 255;
+}
+
+
+
+const char *SGTL5000::getCCName(uint8_t cc)
+{
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: return "SET_DEFAULT_GAINS";
+		case SGTL_CC_INPUT_SELECT			: return "INPUT_SELECT";
+		case SGTL_CC_MIC_GAIN_				: return "MIC_GAIN";
+		case SGTL_CC_LINEIN_LEVEL			: return "LINEIN_LEVEL";
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: return "LINEIN_LEVEL_LEFT";
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return "LINEIN_LEVEL_RIGHT";
+		case SGTL_CC_DAC_VOLUME				: return "DAC_VOLUME";
+		case SGTL_CC_DAC_VOLUME_LEFT		: return "DAC_VOLUME_LEFT";
+		case SGTL_CC_DAC_VOLUME_RIGHT		: return "DAC_VOLUME_RIGHT";
+		case SGTL_CC_DAC_VOLUME_RAMP		: return "DAC_VOLUME_RAMP";
+		case SGTL_CC_LINEOUT_LEVEL			: return "LINEOUT_LEVEL";
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return "LINEOUT_LEVEL_LEFT";
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return "LINEOUT_LEVEL_RIGHT";
+		case SGTL_CC_HP_SELECT				: return "HP_SELECT";
+		case SGTL_CC_HP_VOLUME				: return "HP_VOLUME";
+		case SGTL_CC_HP_VOLUME_LEFT			: return "HP_VOLUME_LEFT";
+		case SGTL_CC_HP_VOLUME_RIGHT		: return "HP_VOLUME_RIGHT";
+		case SGTL_CC_MUTE_HP				: return "MUTE_HP";
+		case SGTL_CC_MUTE_LINEOUT			: return "MUTE_LINEOUT";
+		case SGTL_CC_ADC_HIGH_PASS			: return "ADC_HIGH_PASS";
+		case SGTL_CC_DAP_ENABLE				: return "DAP_ENABLE";
+		case SGTL_CC_SURROUND_ENABLE		: return "SURROUND_ENABLE";
+		case SGTL_CC_SURROUND_WIDTH			: return "SURROUND_WIDTH";
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: return "BASS_ENHANCE_ENABLE";
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: return "BASS_CUTOFF_ENABLE";
+		case SGTL_CC_BASS_CUTOFF_FREQ		: return "BASS_CUTOFF_FREQ";
+		case SGTL_CC_BASS_BOOST				: return "BASS_BOOST";
+		case SGTL_CC_BASS_VOLUME			: return "BASS_VOLUME";
+		case SGTL_CC_EQ_SELECT				: return "EQ_SELECT";
+		case SGTL_CC_EQ_BAND0_BASS			: return "EQ_BAND0_BASS";
+		case SGTL_CC_EQ_BAND1				: return "EQ_BAND1";
+		case SGTL_CC_EQ_BAND2				: return "EQ_BAND2";
+		case SGTL_CC_EQ_BAND3				: return "EQ_BAND3";
+		case SGTL_CC_EQ_BAND4_TREBLE		: return "EQ_BAND4_TREBLE";
+	}
+	return "UNKNOWN_CC";
+}
+
+
+bool SGTL5000::dispatchCC(uint8_t cc, uint8_t val)
+{
+	display(dbg_dispatch,"dispatchCC(%d,%d) %s",cc,val,getCCName(cc));
+
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: return setDefaultGains();
+		case SGTL_CC_INPUT_SELECT			: return setInput(val);
+		case SGTL_CC_MIC_GAIN_				: return setMicGain(val);
+		case SGTL_CC_LINEIN_LEVEL			: return setLineInLevel(val);
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: return setLineInLevelLeft(val);
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return setLineInLevelRight(val);
+		case SGTL_CC_DAC_VOLUME				: return setDacVolume(val);
+		case SGTL_CC_DAC_VOLUME_LEFT		: return setDacVolumeLeft(val);
+		case SGTL_CC_DAC_VOLUME_RIGHT		: return setDacVolumeRight(val);
+		case SGTL_CC_DAC_VOLUME_RAMP		: return setDacVolumeRamp(val);
+		case SGTL_CC_LINEOUT_LEVEL			: return setLineOutLevel(val);
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return setLineOutLevelLeft(val);
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return setLineOutLevelRight(val);
+		case SGTL_CC_HP_SELECT				: return setHeadphoneSelect(val);
+		case SGTL_CC_HP_VOLUME				: return setHeadphoneVolume(val);
+		case SGTL_CC_HP_VOLUME_LEFT			: return setHeadphoneVolumeLeft(val);
+		case SGTL_CC_HP_VOLUME_RIGHT		: return setHeadphoneVolumeRight(val);
+		case SGTL_CC_MUTE_HP				: return setMuteHeadphone(val);
+		case SGTL_CC_MUTE_LINEOUT			: return setMuteLineOut(val);
+		case SGTL_CC_ADC_HIGH_PASS			: return setAdcHighPassFilter(val);
+		case SGTL_CC_DAP_ENABLE				: return setDapEnable(val);
+		case SGTL_CC_SURROUND_ENABLE		: return setSurroundEnable(val);
+		case SGTL_CC_SURROUND_WIDTH			: return setSurroundWidth(val);
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: return setEnableBassEnhance(val);
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: return setEnableBassEnhanceCutoff(val);
+		case SGTL_CC_BASS_CUTOFF_FREQ		: return setBassEnhanceCutoff(val);
+		case SGTL_CC_BASS_BOOST				: return setBassEnhanceBoost(val);
+		case SGTL_CC_BASS_VOLUME			: return setBassEnhanceVolume(val);
+		case SGTL_CC_EQ_SELECT				: return setEqSelect(val);
+		case SGTL_CC_EQ_BAND0_BASS			: return setEqBand(0,val);
+		case SGTL_CC_EQ_BAND1				: return setEqBand(1,val);
+		case SGTL_CC_EQ_BAND2				: return setEqBand(2,val);
+		case SGTL_CC_EQ_BAND3				: return setEqBand(3,val);
+		case SGTL_CC_EQ_BAND4_TREBLE		: return setEqBand(4,val);
+	}
+
+	my_error("unknown dispatchCC(%d,%d)",cc,val);
+	return false;
+}
+
+
+uint8_t SGTL5000::getCC(uint8_t cc)
+{
+	int val = -1;
+
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: val = 255; 							break;
+		case SGTL_CC_INPUT_SELECT			: val = getInput();						break;
+		case SGTL_CC_MIC_GAIN_				: val = getMicGain();	                break;
+		case SGTL_CC_LINEIN_LEVEL			: val = 255; 							break;
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: val = getLineInLevelLeft();	        break;
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: val = getLineInLevelRight();	        break;
+		case SGTL_CC_DAC_VOLUME				: val = 255; 							break;
+		case SGTL_CC_DAC_VOLUME_LEFT		: val = getDacVolumeLeft();	            break;
+		case SGTL_CC_DAC_VOLUME_RIGHT		: val = getDacVolumeRight();	        break;
+		case SGTL_CC_DAC_VOLUME_RAMP		: val = getDacVolumeRamp();	            break;
+		case SGTL_CC_LINEOUT_LEVEL			: val = 255; 							break;
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: val = getLineOutLevelLeft();	        break;
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: val = getLineOutLevelRight();	        break;
+		case SGTL_CC_HP_SELECT				: val = getHeadphoneSelect();	        break;
+		case SGTL_CC_HP_VOLUME				: val = 255; 							break;
+		case SGTL_CC_HP_VOLUME_LEFT			: val = getHeadphoneVolumeLeft();	    break;
+		case SGTL_CC_HP_VOLUME_RIGHT		: val = getHeadphoneVolumeRight();	    break;
+		case SGTL_CC_MUTE_HP				: val = getMuteHeadphone();	            break;
+		case SGTL_CC_MUTE_LINEOUT			: val = getMuteLineOut();	            break;
+		case SGTL_CC_ADC_HIGH_PASS			: val = getAdcHighPassFilter();	        break;
+		case SGTL_CC_DAP_ENABLE				: val = getDapEnable();	                break;
+		case SGTL_CC_SURROUND_ENABLE		: val = getSurroundEnable();	        break;
+		case SGTL_CC_SURROUND_WIDTH			: val = getSurroundWidth();	            break;
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: val = getEnableBassEnhance();	        break;
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: val = getEnableBassEnhanceCutoff();	break;
+		case SGTL_CC_BASS_CUTOFF_FREQ		: val = getBassEnhanceCutoff();	        break;
+		case SGTL_CC_BASS_BOOST				: val = getBassEnhanceBoost();	        break;
+		case SGTL_CC_BASS_VOLUME			: val = getBassEnhanceVolume();	        break;
+		case SGTL_CC_EQ_SELECT				: val = getEqSelect();	                break;
+		case SGTL_CC_EQ_BAND0_BASS			: val = getEqBand(0);	                break;
+		case SGTL_CC_EQ_BAND1				: val = getEqBand(1);	                break;
+		case SGTL_CC_EQ_BAND2				: val = getEqBand(2);	                break;
+		case SGTL_CC_EQ_BAND3				: val = getEqBand(3);	                break;
+		case SGTL_CC_EQ_BAND4_TREBLE		: val = getEqBand(4);	                break;
+	}
+
+	if (val == -1)
+	{
+		my_error("unknown getCC(%d)",cc);
+		val = 0;
+	}
+	else if (val == 255)
+	{
+		my_error("writeOnly getCC(%d)",cc);
+		val = 0;
+	}
+
+	{
+		display(dbg_getcc,"getCC(%-2d) = %-4d  %-20s max=%d",cc,val,getCCName(cc),getCCMax(cc));
+	}
+
+	return val;
+}
+
 
 
 // end of sgtl5000.cpp
