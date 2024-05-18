@@ -32,7 +32,7 @@
 #define HEADPHONE_LINEIN	1	// bypass mode
 	// param to setHeadphoneSelect()
 
-#define DAC_VOLUME_RAMP_NORMAL  	0
+#define DAC_VOLUME_RAMP_EXPONENTIAL 0
 #define DAC_VOLUME_RAMP_LINEAR  	1
 #define DAC_VOLUME_RAMP_DISABLE  	2
 	// param to setDacVolumeRamp()
@@ -87,24 +87,24 @@
 
 #define SGTL_CC_SET_DEFAULT_GAINS		30		//	Write Only
 #define SGTL_CC_INPUT_SELECT			31      //	1				1  		0  									enable() switches to line input
-#define SGTL_CC_MIC_GAIN_				32      //	3               0       0		1 = 20db
-#define SGTL_CC_LINEIN_LEVEL			33		//	255
-#define SGTL_CC_LINEIN_LEVEL_LEFT		34      //	15              7       7		7 = middle of range
-#define SGTL_CC_LINEIN_LEVEL_RIGHT		35      //	15              7       7		7
+#define SGTL_CC_MIC_GAIN_				32      //	3               0       		1 = 20db
+#define SGTL_CC_LINEIN_LEVEL			33		//	Write Only
+#define SGTL_CC_LINEIN_LEVEL_LEFT		34      //	15              0       		7 = middle of range
+#define SGTL_CC_LINEIN_LEVEL_RIGHT		35      //	15              0       		7
 #define SGTL_CC_DAC_VOLUME				36		//	Write Only
-#define SGTL_CC_DAC_VOLUME_LEFT			37      //	127             60      60
-#define SGTL_CC_DAC_VOLUME_RIGHT		38      //	127             60      60
-#define SGTL_CC_DAC_VOLUME_RAMP			39      //	2               1       0  									enable() switches to normal (exponential, not linear) ramping
-#define SGTL_CC_LINEOUT_LEVEL			40		//	255
-#define SGTL_CC_LINEOUT_LEVEL_LEFT		41      //	31              27      2  		13 = middle of range
-#define SGTL_CC_LINEOUT_LEVEL_RIGHT		42      //	31              27      2		13 = but upper of paul's 0..18 range
-#define SGTL_CC_HP_SELECT				43      //	1               0       0
+#define SGTL_CC_DAC_VOLUME_LEFT			37      //	127             60      60									enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_RIGHT		38      //	127             60      60									enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_RAMP			39      //	2               1       0  									enable() enables exponential, not linear, ramping
+#define SGTL_CC_LINEOUT_LEVEL			40		//	Write Only
+#define SGTL_CC_LINEOUT_LEVEL_LEFT		41      //	31              27      2  		13 = middle of range, but	enable() explicitly sets LINE_OUT levels
+#define SGTL_CC_LINEOUT_LEVEL_RIGHT		42      //	31              27      2		13 = upper of paul's 0..18	enable() explicitly sets LINE_OUT levels
+#define SGTL_CC_HP_SELECT				43      //	1               0       0									enable() explicitly write CHIP_ANA_CTRL, including this bit
 #define SGTL_CC_HP_VOLUME				44		//	Write Only
 #define SGTL_CC_HP_VOLUME_LEFT			45      //	127             97      0		97							enable() currently turns the headphones all the way down
-#define SGTL_CC_HP_VOLUME_RIGHT			46      //	127             97      0		97
-#define SGTL_CC_MUTE_HP					47      //	1               0       1  		0							and then enable() mutes the headphones
-#define SGTL_CC_MUTE_LINEOUT			48      //	1               0       0		0
-#define SGTL_CC_ADC_HIGH_PASS			49      //	2               0       0
+#define SGTL_CC_HP_VOLUME_RIGHT			46      //	127             97      0		97							enable() currently turns the headphones all the way down
+#define SGTL_CC_MUTE_HP					47      //	1               0       1  		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
+#define SGTL_CC_MUTE_LINEOUT			48      //	1               0       0		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
+#define SGTL_CC_ADC_HIGH_PASS			49      //	2               0
 #define SGTL_CC_DAP_ENABLE				50      //	2               0
 #define SGTL_CC_SURROUND_ENABLE			51      //	2               0
 #define SGTL_CC_SURROUND_WIDTH			52      //	7               4

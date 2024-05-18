@@ -589,21 +589,37 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 {
 	display(dbg_api,"SGTL5000::enable() called",0);
 
-	Wire.begin();
-	delay(5);
-
-	dumpCCValues("reset");
-
 	m_hp_muted = true;
-	m_lineout_muted = false;
+	m_lineout_muted = true;		// prh change to mute lineout on startup
 	memset(m_band_value,0x2f,5);
 	memset(m_band_target,0x2f,5);
 	m_in_automation	= 0;
 
+	Wire.begin();
+	delay(5);
+
+	uint16_t id = read(CHIP_ID);
+	if ((id & 0xff00) != 0xa000)
+	{
+		my_error("SGTL5000 incorrect CHIP_ID=0x%04X",id);
+		return false;
+	}
+	display(0,"SGTL5000 CHIP_ID=0x%04X",id);
+
+	// prh additions
+	// if the CHIP_LINREG_CTRL is non-zero it means that the
+	// 		chip was still running and the teensy was reset.
+	// if so, we get a big pop when we execute the rest of
+	//		this code.
+	// simple attempt to short return if it's already setup
+
+	uint16_t line_reg = read(CHIP_LINREG_CTRL);
+	display(0,"SGTL5000 CHIP_LINREG_CTRL=0x%04X",line_reg);
+
 	// Check if we are in Master Mode and if the Teensy had a reset
 
-	unsigned int n = read(CHIP_I2S_CTRL);
-	if ( (extMCLK > 0) && (n == (0x0030 | (1<<7))) )
+	unsigned int i2s_ctrl = read(CHIP_I2S_CTRL);
+	if (line_reg || ( (extMCLK > 0) && (i2s_ctrl == (0x0030 | (1<<7))) ))
 	{
 		// if so, do not initialize, instead, read
 		// all needed state variables, wiping out
@@ -624,20 +640,18 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 		return true;
 	}
 
-	//Serial.print("chip ID = ");
-	//delay(5);
-	//unsigned int n = read(CHIP_ID);
-	//Serial.println(n, HEX);
 
-	int r = write(CHIP_ANA_POWER, 0x4060);  // VDDD is externally driven with 1.8V
-	if (!r) return false;
+	dumpCCValues("reset");
+
+
+	write(CHIP_ANA_POWER, 		0x4060);  	// VDDD is externally driven with 1.8V
 	write(CHIP_LINREG_CTRL, 	0x006C);	// VDDA & VDDIO both over 3.1V
 	write(CHIP_REF_CTRL, 		0x01F2);	// VAG=1.575, normal ramp, +12.5% bias current
 	write(CHIP_LINE_OUT_CTRL, 	0x0F22);	// LO_VAGCNTRL=1.65V, OUT_CURRENT=0.54mA
 	write(CHIP_SHORT_CTRL, 		0x4446); 	// allow up to 125mA
 	write(CHIP_ANA_CTRL, 		0x0137);	// enable zero cross detectors
 		//  0x100 = line out mute
-		// !0x040 = dac->headphone
+		// !0x040 = dac->headphone (not bypass mode)
 		//  0x020 = enable dac zero cross detector
 		//  0x010 = mute headphone output
 		//  0x004 = select line in input
@@ -692,8 +706,13 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 
 	write(CHIP_ANA_HP_CTRL, 0x7F7F);	// hp volume to lowest level (0 on my scale)
 
-	write(CHIP_ANA_CTRL, 	0x0036);	// enable zero cross detectors
-		// !0x100 = unmute line out
+	// prh change - leave the lineout muted
+	// in favor of allowing client to ramp the
+	// lineout volume up ..
+
+	write(CHIP_ANA_CTRL, 	0x0136);	// enable zero cross detectors
+		// old !0x100 = unmute line out
+		// new  0x100 = mute line out
 		// !0x040 = dac->headphone
 		//  0x020 = enable zero cross detector
 		//  0x010 = mute headphone output
@@ -768,12 +787,14 @@ bool SGTL5000::setDefaultGains()
 	proc_entry();
 
 	bool retval =
+		setMuteHeadphone(1) &&
+		setMuteLineOut(1) &&
 		setMicGain(1) &&			// 20db
 		setLineInLevel(7) &&		// reset default = 11db (0.94 Volts p-p measured)
-		setMuteHeadphone(0) &&
-		setMuteLineOut(0) &&
 		setLineOutLevel(13) &&
-		setHeadphoneVolume(97);		// reset default
+		setHeadphoneVolume(97) &&		// reset default
+		setMuteHeadphone(0) &&
+		setMuteLineOut(0);
 
 	proc_leave();
 	return retval;
@@ -888,6 +909,7 @@ bool SGTL5000::setDacVolumeRamp(uint8_t val)
 		return modify(CHIP_ADCDAC_CTRL, 0, 0x300);
 	else if (val == DAC_VOLUME_RAMP_LINEAR)
 		return modify(CHIP_ADCDAC_CTRL, 0x200, 0x300);
+	// DAC_VOLUME_RAMP_EXPONENTIAL
 	return modify(CHIP_ADCDAC_CTRL, 0x300, 0x300);
 }
 uint8_t SGTL5000::getDacVolumeRamp()
@@ -896,7 +918,7 @@ uint8_t SGTL5000::getDacVolumeRamp()
 	return
 		vol == 0x300 ? DAC_VOLUME_RAMP_DISABLE :
 		vol == 0x200 ? DAC_VOLUME_RAMP_LINEAR :
-		DAC_VOLUME_RAMP_NORMAL;
+		DAC_VOLUME_RAMP_EXPONENTIAL;
 }
 
 
