@@ -1626,7 +1626,7 @@ void SGTL5000::dumpCCValues(const char *where)
 		{
 			if (!sgtl5000_writeOnlyCC(cc))
 				getCC(cc);
-			else if (1)
+			else if (0)
 				display(0,"",0);
 		}
 		proc_leave();
@@ -1640,6 +1640,7 @@ bool SGTL5000::dispatchCC(uint8_t cc, uint8_t val)
 
 	switch (cc)
 	{
+		case SGTL_CC_DUMP					: dumpCCValues("dump"); return 1;
 		case SGTL_CC_SET_DEFAULT_GAINS		: return setDefaultGains();
 		case SGTL_CC_INPUT_SELECT			: return setInput(val);
 		case SGTL_CC_MIC_GAIN_				: return setMicGain(val);
@@ -1687,6 +1688,7 @@ uint8_t SGTL5000::getCC(uint8_t cc)
 
 	switch (cc)
 	{
+		case SGTL_CC_DUMP					: val = 255; 							break;
 		case SGTL_CC_SET_DEFAULT_GAINS		: val = 255; 							break;
 		case SGTL_CC_INPUT_SELECT			: val = getInput();						break;
 		case SGTL_CC_MIC_GAIN_				: val = getMicGain();	                break;
@@ -1752,7 +1754,8 @@ uint8_t SGTL5000::getCC(uint8_t cc)
 // extern
 bool sgtl5000_writeOnlyCC(uint8_t cc)
 {
-	if (cc == SGTL_CC_SET_DEFAULT_GAINS ||
+	if (cc == SGTL_CC_DUMP ||
+		cc == SGTL_CC_SET_DEFAULT_GAINS ||
 		cc == SGTL_CC_LINEIN_LEVEL ||
 		cc == SGTL_CC_DAC_VOLUME ||
 		cc == SGTL_CC_LINEOUT_LEVEL ||
@@ -1769,6 +1772,7 @@ uint8_t sgtl5000_getCCMax(uint8_t cc)
 
 	switch (cc)
 	{
+		case SGTL_CC_DUMP					: return 1;
 		case SGTL_CC_SET_DEFAULT_GAINS		: return 1;
 		case SGTL_CC_INPUT_SELECT			: return 1;
 		case SGTL_CC_MIC_GAIN_				: return 3;
@@ -1813,6 +1817,7 @@ const char *sgtl5000_getCCName(uint8_t cc)
 {
 	switch (cc)
 	{
+		case SGTL_CC_DUMP					: return "DUMP";
 		case SGTL_CC_SET_DEFAULT_GAINS		: return "SET_DEFAULT_GAINS";
 		case SGTL_CC_INPUT_SELECT			: return "INPUT_SELECT";
 		case SGTL_CC_MIC_GAIN_				: return "MIC_GAIN";

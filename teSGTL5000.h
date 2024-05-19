@@ -91,45 +91,46 @@ extern uint8_t sgtl5000_getCCMax(uint8_t cc);				// get the maximum value (range
 
 // Values on my scales							//	MAX				RESET	ENABLE	setDefaultGains				notes
 
-#define SGTL_CC_SET_DEFAULT_GAINS		30		//	Write Only
-#define SGTL_CC_INPUT_SELECT			31      //	1				1  		0  									enable() switches to line input
-#define SGTL_CC_MIC_GAIN_				32      //	3               0       		1 = 20db
-#define SGTL_CC_LINEIN_LEVEL			33		//	Write Only
-#define SGTL_CC_LINEIN_LEVEL_LEFT		34      //	15              0       		7 = middle of range
-#define SGTL_CC_LINEIN_LEVEL_RIGHT		35      //	15              0       		7
-#define SGTL_CC_DAC_VOLUME				36		//	Write Only
-#define SGTL_CC_DAC_VOLUME_LEFT			37      //	127             60      60									enable() explicitly re-sets the default value
-#define SGTL_CC_DAC_VOLUME_RIGHT		38      //	127             60      60									enable() explicitly re-sets the default value
-#define SGTL_CC_DAC_VOLUME_RAMP			39      //	2               1       0  									enable() enables exponential, not linear, ramping
-#define SGTL_CC_LINEOUT_LEVEL			40		//	Write Only
-#define SGTL_CC_LINEOUT_LEVEL_LEFT		41      //	31              27      2  		13 = middle of range, but	enable() explicitly sets LINE_OUT levels
-#define SGTL_CC_LINEOUT_LEVEL_RIGHT		42      //	31              27      2		13 = upper of paul's 0..18	enable() explicitly sets LINE_OUT levels
-#define SGTL_CC_HP_SELECT				43      //	1               0       0									enable() explicitly write CHIP_ANA_CTRL, including this bit
-#define SGTL_CC_HP_VOLUME				44		//	Write Only
-#define SGTL_CC_HP_VOLUME_LEFT			45      //	127             97      0		97							enable() currently turns the headphones all the way down
-#define SGTL_CC_HP_VOLUME_RIGHT			46      //	127             97      0		97							enable() currently turns the headphones all the way down
-#define SGTL_CC_MUTE_HP					47      //	1               0       1  		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
-#define SGTL_CC_MUTE_LINEOUT			48      //	1               0       0		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
-#define SGTL_CC_ADC_HIGH_PASS			49      //	2               0
-#define SGTL_CC_DAP_ENABLE				50      //	2               0
-#define SGTL_CC_SURROUND_ENABLE			51      //	2               0
-#define SGTL_CC_SURROUND_WIDTH			52      //	7               4
-#define SGTL_CC_BASS_ENHANCE_ENABLE		53      //	1               0
-#define SGTL_CC_BASS_CUTOFF_ENABLE		54      //	1               0
-#define SGTL_CC_BASS_CUTOFF_FREQ		55      //	6               4
-#define SGTL_CC_BASS_BOOST				56      //	127             96
-#define SGTL_CC_BASS_VOLUME				57      //	63              58
-#define SGTL_CC_EQ_SELECT				58      //	3               0
-#define SGTL_CC_EQ_BAND0_BASS			59      //	95              15
-#define SGTL_CC_EQ_BAND1				60      //	95              15
-#define SGTL_CC_EQ_BAND2				61      //	95              15
-#define SGTL_CC_EQ_BAND3				62      //	95              15
-#define SGTL_CC_EQ_BAND4_TREBLE			63      //	95              15
+#define SGTL_CC_DUMP					30		//  Write Only
+#define SGTL_CC_SET_DEFAULT_GAINS		31		//	Write Only
+#define SGTL_CC_INPUT_SELECT			32      //	1				1  		0  									enable() switches to line input
+#define SGTL_CC_MIC_GAIN_				33      //	3               0       		1 = 20db
+#define SGTL_CC_LINEIN_LEVEL			34		//	Write Only
+#define SGTL_CC_LINEIN_LEVEL_LEFT		35      //	15              0       		7 = middle of range
+#define SGTL_CC_LINEIN_LEVEL_RIGHT		36      //	15              0       		7
+#define SGTL_CC_DAC_VOLUME				37		//	Write Only
+#define SGTL_CC_DAC_VOLUME_LEFT			38      //	127             60      60									enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_RIGHT		39      //	127             60      60									enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_RAMP			40      //	2               1       0  									enable() enables exponential, not linear, ramping
+#define SGTL_CC_LINEOUT_LEVEL			41		//	Write Only
+#define SGTL_CC_LINEOUT_LEVEL_LEFT		42      //	31              27      2  		13 = middle of range, but	enable() explicitly sets LINE_OUT levels
+#define SGTL_CC_LINEOUT_LEVEL_RIGHT		43      //	31              27      2		13 = upper of paul's 0..18	enable() explicitly sets LINE_OUT levels
+#define SGTL_CC_HP_SELECT				44      //	1               0       0									enable() explicitly write CHIP_ANA_CTRL, including this bit
+#define SGTL_CC_HP_VOLUME				45		//	Write Only
+#define SGTL_CC_HP_VOLUME_LEFT			46      //	127             97      0		97							enable() currently turns the headphones all the way down
+#define SGTL_CC_HP_VOLUME_RIGHT			47      //	127             97      0		97							enable() currently turns the headphones all the way down
+#define SGTL_CC_MUTE_HP					48      //	1               0       1  		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
+#define SGTL_CC_MUTE_LINEOUT			49      //	1               0       0		0							enable() explicitly write CHIP_ANA_CTRL, including this bit
+#define SGTL_CC_ADC_HIGH_PASS			50      //	2               0
+#define SGTL_CC_DAP_ENABLE				51      //	2               0
+#define SGTL_CC_SURROUND_ENABLE			52      //	2               0
+#define SGTL_CC_SURROUND_WIDTH			53      //	7               4
+#define SGTL_CC_BASS_ENHANCE_ENABLE		54      //	1               0
+#define SGTL_CC_BASS_CUTOFF_ENABLE		55      //	1               0
+#define SGTL_CC_BASS_CUTOFF_FREQ		56      //	6               4
+#define SGTL_CC_BASS_BOOST				57      //	127             96
+#define SGTL_CC_BASS_VOLUME				58      //	63              58
+#define SGTL_CC_EQ_SELECT				59      //	3               0
+#define SGTL_CC_EQ_BAND0_BASS			60      //	95              15
+#define SGTL_CC_EQ_BAND1				61      //	95              15
+#define SGTL_CC_EQ_BAND2				62      //	95              15
+#define SGTL_CC_EQ_BAND3				63      //	95              15
+#define SGTL_CC_EQ_BAND4_TREBLE			64      //	95              15
 
-// #define SGTL_CC_AVC					64		// unimplmented reminder need range
-// #define SGTL_CC_PEQ					65		// unimplemented reminder need huge range
+// #define SGTL_CC_AVC					65		// unimplmented reminder need range
+// #define SGTL_CC_PEQ					66		// unimplemented reminder need huge range
 
-#define SGTL_CC_MAX						63
+#define SGTL_CC_MAX						64
 
 
 
