@@ -20,7 +20,6 @@
 #define MIDI_TYPE_PGM_CHG		0x0C
 
 
-
 //----------------------
 // msgUnion
 //----------------------
@@ -102,12 +101,15 @@ class msgUnion
         bool isOutput()				const { return b[2] & MIDI_OUTPUT_B2_FLAG; }
 		bool isActiveSense()		const { return (i & 0xff0f) == 0xfe0f; }
 
-	// data
+	//------------------------------
+	// public data
+	//------------------------------
 
     union {
         uint32_t i;
         uint8_t b[4];
     };
+
 };
 
 

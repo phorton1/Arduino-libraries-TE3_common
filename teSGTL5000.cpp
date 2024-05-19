@@ -26,6 +26,10 @@
 
 #include <Arduino.h>
 #include "teSGTL5000.h"
+
+#ifdef CORE_TEENSY
+	// most of the file is included only on the teensy
+
 #include <Wire.h>
 #include <myDebug.h>
 
@@ -1612,17 +1616,6 @@ void SGTL5000::calcBiquad(uint8_t filtertype, float fC, float dB_Gain, float Q, 
 // MIDI API
 //-------------------------------------------------
 
-bool SGTL5000::writeOnlyCC(uint8_t cc)
-{
-	if (cc == SGTL_CC_SET_DEFAULT_GAINS ||
-		cc == SGTL_CC_LINEIN_LEVEL ||
-		cc == SGTL_CC_DAC_VOLUME ||
-		cc == SGTL_CC_LINEOUT_LEVEL ||
-		cc == SGTL_CC_HP_VOLUME)
-		return true;
-	return false;
-}
-
 
 void SGTL5000::dumpCCValues(const char *where)
 {
@@ -1631,7 +1624,7 @@ void SGTL5000::dumpCCValues(const char *where)
 		proc_entry();
 		for (uint8_t cc=SGTL_CC_BASE; cc<=SGTL_CC_MAX; cc++)
 		{
-			if (!writeOnlyCC(cc))
+			if (!sgtl5000_writeOnlyCC(cc))
 				getCC(cc);
 			else if (1)
 				display(0,"",0);
@@ -1641,99 +1634,9 @@ void SGTL5000::dumpCCValues(const char *where)
 }
 
 
-
-uint8_t SGTL5000::getCCMax(uint8_t cc)
-{
-	// 255 returned for unknown or writeOnly cc's
-
-	switch (cc)
-	{
-		case SGTL_CC_SET_DEFAULT_GAINS		: return 255;
-		case SGTL_CC_INPUT_SELECT			: return 1;
-		case SGTL_CC_MIC_GAIN_				: return 3;
-		case SGTL_CC_LINEIN_LEVEL			: return 255;
-		case SGTL_CC_LINEIN_LEVEL_LEFT		: return 15;
-		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return 15;
-		case SGTL_CC_DAC_VOLUME				: return 255;
-		case SGTL_CC_DAC_VOLUME_LEFT		: return 127;
-		case SGTL_CC_DAC_VOLUME_RIGHT		: return 127;
-		case SGTL_CC_DAC_VOLUME_RAMP		: return 2;
-		case SGTL_CC_LINEOUT_LEVEL			: return 255;
-		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return 31;
-		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return 31;
-		case SGTL_CC_HP_SELECT				: return 1;
-		case SGTL_CC_HP_VOLUME				: return 255;
-		case SGTL_CC_HP_VOLUME_LEFT			: return 127;
-		case SGTL_CC_HP_VOLUME_RIGHT		: return 127;
-		case SGTL_CC_MUTE_HP				: return 1;
-		case SGTL_CC_MUTE_LINEOUT			: return 1;
-		case SGTL_CC_ADC_HIGH_PASS			: return 2;
-		case SGTL_CC_DAP_ENABLE				: return 2;
-		case SGTL_CC_SURROUND_ENABLE		: return 2;
-		case SGTL_CC_SURROUND_WIDTH			: return 7;
-		case SGTL_CC_BASS_ENHANCE_ENABLE	: return 1;
-		case SGTL_CC_BASS_CUTOFF_ENABLE		: return 1;
-		case SGTL_CC_BASS_CUTOFF_FREQ		: return 6;
-		case SGTL_CC_BASS_BOOST				: return 127;
-		case SGTL_CC_BASS_VOLUME			: return 0x3f;
-		case SGTL_CC_EQ_SELECT				: return 3;
-		case SGTL_CC_EQ_BAND0_BASS			: return 0x5f;
-		case SGTL_CC_EQ_BAND1				: return 0x5f;
-		case SGTL_CC_EQ_BAND2				: return 0x5f;
-		case SGTL_CC_EQ_BAND3				: return 0x5f;
-		case SGTL_CC_EQ_BAND4_TREBLE		: return 0x5f;
-	}
-	return 255;
-}
-
-
-
-const char *SGTL5000::getCCName(uint8_t cc)
-{
-	switch (cc)
-	{
-		case SGTL_CC_SET_DEFAULT_GAINS		: return "SET_DEFAULT_GAINS";
-		case SGTL_CC_INPUT_SELECT			: return "INPUT_SELECT";
-		case SGTL_CC_MIC_GAIN_				: return "MIC_GAIN";
-		case SGTL_CC_LINEIN_LEVEL			: return "LINEIN_LEVEL";
-		case SGTL_CC_LINEIN_LEVEL_LEFT		: return "LINEIN_LEVEL_LEFT";
-		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return "LINEIN_LEVEL_RIGHT";
-		case SGTL_CC_DAC_VOLUME				: return "DAC_VOLUME";
-		case SGTL_CC_DAC_VOLUME_LEFT		: return "DAC_VOLUME_LEFT";
-		case SGTL_CC_DAC_VOLUME_RIGHT		: return "DAC_VOLUME_RIGHT";
-		case SGTL_CC_DAC_VOLUME_RAMP		: return "DAC_VOLUME_RAMP";
-		case SGTL_CC_LINEOUT_LEVEL			: return "LINEOUT_LEVEL";
-		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return "LINEOUT_LEVEL_LEFT";
-		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return "LINEOUT_LEVEL_RIGHT";
-		case SGTL_CC_HP_SELECT				: return "HP_SELECT";
-		case SGTL_CC_HP_VOLUME				: return "HP_VOLUME";
-		case SGTL_CC_HP_VOLUME_LEFT			: return "HP_VOLUME_LEFT";
-		case SGTL_CC_HP_VOLUME_RIGHT		: return "HP_VOLUME_RIGHT";
-		case SGTL_CC_MUTE_HP				: return "MUTE_HP";
-		case SGTL_CC_MUTE_LINEOUT			: return "MUTE_LINEOUT";
-		case SGTL_CC_ADC_HIGH_PASS			: return "ADC_HIGH_PASS";
-		case SGTL_CC_DAP_ENABLE				: return "DAP_ENABLE";
-		case SGTL_CC_SURROUND_ENABLE		: return "SURROUND_ENABLE";
-		case SGTL_CC_SURROUND_WIDTH			: return "SURROUND_WIDTH";
-		case SGTL_CC_BASS_ENHANCE_ENABLE	: return "BASS_ENHANCE_ENABLE";
-		case SGTL_CC_BASS_CUTOFF_ENABLE		: return "BASS_CUTOFF_ENABLE";
-		case SGTL_CC_BASS_CUTOFF_FREQ		: return "BASS_CUTOFF_FREQ";
-		case SGTL_CC_BASS_BOOST				: return "BASS_BOOST";
-		case SGTL_CC_BASS_VOLUME			: return "BASS_VOLUME";
-		case SGTL_CC_EQ_SELECT				: return "EQ_SELECT";
-		case SGTL_CC_EQ_BAND0_BASS			: return "EQ_BAND0_BASS";
-		case SGTL_CC_EQ_BAND1				: return "EQ_BAND1";
-		case SGTL_CC_EQ_BAND2				: return "EQ_BAND2";
-		case SGTL_CC_EQ_BAND3				: return "EQ_BAND3";
-		case SGTL_CC_EQ_BAND4_TREBLE		: return "EQ_BAND4_TREBLE";
-	}
-	return "UNKNOWN_CC";
-}
-
-
 bool SGTL5000::dispatchCC(uint8_t cc, uint8_t val)
 {
-	display(dbg_dispatch,"dispatchCC(%d,%d) %s",cc,val,getCCName(cc));
+	display(dbg_dispatch,"dispatchCC(%d,%d) %s",cc,val,sgtl5000_getCCName(cc));
 
 	switch (cc)
 	{
@@ -1832,11 +1735,123 @@ uint8_t SGTL5000::getCC(uint8_t cc)
 	}
 
 	{
-		display(dbg_getcc,"getCC(%-2d) = %-4d  %-20s max=%d",cc,val,getCCName(cc),getCCMax(cc));
+		display(dbg_getcc,"getCC(%-2d) = %-4d  %-20s max=%d",cc,val,sgtl5000_getCCName(cc),sgtl5000_getCCMax(cc));
 	}
 
 	return val;
 }
+
+#endif	// #ifdef CORE_TEENSY!!!
+
+
+
+//-------------------------------------------
+// Cross Platform API
+//-------------------------------------------
+
+// extern
+bool sgtl5000_writeOnlyCC(uint8_t cc)
+{
+	if (cc == SGTL_CC_SET_DEFAULT_GAINS ||
+		cc == SGTL_CC_LINEIN_LEVEL ||
+		cc == SGTL_CC_DAC_VOLUME ||
+		cc == SGTL_CC_LINEOUT_LEVEL ||
+		cc == SGTL_CC_HP_VOLUME)
+		return true;
+	return false;
+}
+
+
+// extern
+uint8_t sgtl5000_getCCMax(uint8_t cc)
+{
+	// 255 returned for unknown or writeOnly cc's
+
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: return 1;
+		case SGTL_CC_INPUT_SELECT			: return 1;
+		case SGTL_CC_MIC_GAIN_				: return 3;
+		case SGTL_CC_LINEIN_LEVEL			: return 15;
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: return 15;
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return 15;
+		case SGTL_CC_DAC_VOLUME				: return 127;
+		case SGTL_CC_DAC_VOLUME_LEFT		: return 127;
+		case SGTL_CC_DAC_VOLUME_RIGHT		: return 127;
+		case SGTL_CC_DAC_VOLUME_RAMP		: return 2;
+		case SGTL_CC_LINEOUT_LEVEL			: return 31;
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return 31;
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return 31;
+		case SGTL_CC_HP_SELECT				: return 1;
+		case SGTL_CC_HP_VOLUME				: return 127;
+		case SGTL_CC_HP_VOLUME_LEFT			: return 127;
+		case SGTL_CC_HP_VOLUME_RIGHT		: return 127;
+		case SGTL_CC_MUTE_HP				: return 1;
+		case SGTL_CC_MUTE_LINEOUT			: return 1;
+		case SGTL_CC_ADC_HIGH_PASS			: return 2;
+		case SGTL_CC_DAP_ENABLE				: return 2;
+		case SGTL_CC_SURROUND_ENABLE		: return 2;
+		case SGTL_CC_SURROUND_WIDTH			: return 7;
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: return 1;
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: return 1;
+		case SGTL_CC_BASS_CUTOFF_FREQ		: return 6;
+		case SGTL_CC_BASS_BOOST				: return 127;
+		case SGTL_CC_BASS_VOLUME			: return 0x3f;
+		case SGTL_CC_EQ_SELECT				: return 3;
+		case SGTL_CC_EQ_BAND0_BASS			: return 0x5f;
+		case SGTL_CC_EQ_BAND1				: return 0x5f;
+		case SGTL_CC_EQ_BAND2				: return 0x5f;
+		case SGTL_CC_EQ_BAND3				: return 0x5f;
+		case SGTL_CC_EQ_BAND4_TREBLE		: return 0x5f;
+	}
+	return 255;
+}
+
+
+// extern
+const char *sgtl5000_getCCName(uint8_t cc)
+{
+	switch (cc)
+	{
+		case SGTL_CC_SET_DEFAULT_GAINS		: return "SET_DEFAULT_GAINS";
+		case SGTL_CC_INPUT_SELECT			: return "INPUT_SELECT";
+		case SGTL_CC_MIC_GAIN_				: return "MIC_GAIN";
+		case SGTL_CC_LINEIN_LEVEL			: return "LINEIN_LEVEL";
+		case SGTL_CC_LINEIN_LEVEL_LEFT		: return "LINEIN_LEVEL_LEFT";
+		case SGTL_CC_LINEIN_LEVEL_RIGHT		: return "LINEIN_LEVEL_RIGHT";
+		case SGTL_CC_DAC_VOLUME				: return "DAC_VOLUME";
+		case SGTL_CC_DAC_VOLUME_LEFT		: return "DAC_VOLUME_LEFT";
+		case SGTL_CC_DAC_VOLUME_RIGHT		: return "DAC_VOLUME_RIGHT";
+		case SGTL_CC_DAC_VOLUME_RAMP		: return "DAC_VOLUME_RAMP";
+		case SGTL_CC_LINEOUT_LEVEL			: return "LINEOUT_LEVEL";
+		case SGTL_CC_LINEOUT_LEVEL_LEFT		: return "LINEOUT_LEVEL_LEFT";
+		case SGTL_CC_LINEOUT_LEVEL_RIGHT	: return "LINEOUT_LEVEL_RIGHT";
+		case SGTL_CC_HP_SELECT				: return "HP_SELECT";
+		case SGTL_CC_HP_VOLUME				: return "HP_VOLUME";
+		case SGTL_CC_HP_VOLUME_LEFT			: return "HP_VOLUME_LEFT";
+		case SGTL_CC_HP_VOLUME_RIGHT		: return "HP_VOLUME_RIGHT";
+		case SGTL_CC_MUTE_HP				: return "MUTE_HP";
+		case SGTL_CC_MUTE_LINEOUT			: return "MUTE_LINEOUT";
+		case SGTL_CC_ADC_HIGH_PASS			: return "ADC_HIGH_PASS";
+		case SGTL_CC_DAP_ENABLE				: return "DAP_ENABLE";
+		case SGTL_CC_SURROUND_ENABLE		: return "SURROUND_ENABLE";
+		case SGTL_CC_SURROUND_WIDTH			: return "SURROUND_WIDTH";
+		case SGTL_CC_BASS_ENHANCE_ENABLE	: return "BASS_ENHANCE_ENABLE";
+		case SGTL_CC_BASS_CUTOFF_ENABLE		: return "BASS_CUTOFF_ENABLE";
+		case SGTL_CC_BASS_CUTOFF_FREQ		: return "BASS_CUTOFF_FREQ";
+		case SGTL_CC_BASS_BOOST				: return "BASS_BOOST";
+		case SGTL_CC_BASS_VOLUME			: return "BASS_VOLUME";
+		case SGTL_CC_EQ_SELECT				: return "EQ_SELECT";
+		case SGTL_CC_EQ_BAND0_BASS			: return "EQ_BAND0_BASS";
+		case SGTL_CC_EQ_BAND1				: return "EQ_BAND1";
+		case SGTL_CC_EQ_BAND2				: return "EQ_BAND2";
+		case SGTL_CC_EQ_BAND3				: return "EQ_BAND3";
+		case SGTL_CC_EQ_BAND4_TREBLE		: return "EQ_BAND4_TREBLE";
+	}
+	return "UNKNOWN_CC";
+}
+
+
 
 
 
