@@ -39,8 +39,18 @@
 #define dbg_getcc		0
 
 #define DUMP_CCS		1
+	// dump the configuration, in terms of CC's and my scales
+	// at top of enable(), on short return or end of enable(),
+	// and at end of setDefaultGains().
+
+#define TRIGGER_PIN		0
+	// set this to a pin to trigger logic the analyzer
+	// at top of enable (or anywhere else needed).
 
 
+//---------------------------------------
+// SGTL5000 Registers
+//---------------------------------------
 
 #define CHIP_ID					0x0000
 // 15:8 PARTID		0xA0 - 8 bit identifier for SGTL5000
@@ -602,6 +612,13 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 	Wire.begin();
 	delay(5);
 
+	#if TRIGGER_PIN
+		pinMode(TRIGGER_PIN,OUTPUT);
+		digitalWrite(TRIGGER_PIN,1);
+		delay(10);
+		digitalWrite(TRIGGER_PIN,0);
+	#endif
+	
 	uint16_t id = read(CHIP_ID);
 	if ((id & 0xff00) != 0xa000)
 	{
@@ -617,7 +634,7 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 	//		this code.
 	// simple attempt to short return if it's already setup
 
-	uint16_t line_reg = read(CHIP_LINREG_CTRL);
+	uint16_t line_reg = 0;	// read(CHIP_LINREG_CTRL);
 	display(0,"SGTL5000 CHIP_LINREG_CTRL=0x%04X",line_reg);
 
 	// Check if we are in Master Mode and if the Teensy had a reset
@@ -639,14 +656,18 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 			m_band_target[i] = m_band_value[i];
 		}
 
-		dumpCCValues("on enable() short return");
+		#if DUMP_CCS
+			dumpCCValues("on enable() short return");
+		#endif
+
 		display(dbg_api,"SGTL5000::enable() returning from teensy Reset",0);
 		return true;
 	}
 
 
-	dumpCCValues("reset");
-
+	#if DUMP_CCS
+		dumpCCValues("reset");
+	#endif
 
 	write(CHIP_ANA_POWER, 		0x4060);  	// VDDD is externally driven with 1.8V
 	write(CHIP_LINREG_CTRL, 	0x006C);	// VDDA & VDDIO both over 3.1V
@@ -724,7 +745,9 @@ bool SGTL5000::enable(const unsigned extMCLK, const uint32_t pllFreq)
 		//  0x002 = enable adc zero crossing
 		// !0x001 = unmute analog (line in) volume
 
-	dumpCCValues("at end of enable()");
+	#if DUMP_CCS
+		dumpCCValues("at end of enable()");
+	#endif
 
 	display(dbg_api,"SGTL5000::enable() finished",0);
 	return true;
@@ -790,17 +813,37 @@ bool SGTL5000::setDefaultGains()
 	display(dbg_api,"SGTL5000::setDefaultGains()",0);
 	proc_entry();
 
-	bool retval =
-		setMuteHeadphone(1) &&
-		setMuteLineOut(1) &&
-		setMicGain(1) &&			// 20db
-		setLineInLevel(7) &&		// reset default = 11db (0.94 Volts p-p measured)
-		setLineOutLevel(13) &&
-		setHeadphoneVolume(97) &&		// reset default
-		setMuteHeadphone(0) &&
-		setMuteLineOut(0);
+	#if 1	// values that are currently working with the guitar
+
+		bool retval =
+			setMuteHeadphone(1) &&
+			setMuteLineOut(1) &&
+			// enable() &&
+			setLineInLevel(7) &&			// reset default = 11db (0.94 Volts p-p measured)
+			setLineOutLevel(13) &&
+			setHeadphoneVolume(97) &&		// reset default
+			setMuteHeadphone(0);
+
+	#else
+
+		bool retval =
+			setMuteHeadphone(1) &&
+			setMuteLineOut(1) &&
+			setMicGain(1) &&			// 20db
+			setLineInLevel(7) &&		// reset default = 11db (0.94 Volts p-p measured)
+			setLineOutLevel(13) &&
+			setHeadphoneVolume(97) &&		// reset default
+			setMuteHeadphone(0) &&
+			setMuteLineOut(0);
+
+	#endif
 
 	proc_leave();
+
+	#if DUMP_CCS
+		dumpCCValues("at end of setDefaultGains()");
+	#endif
+
 	return retval;
 }
 
@@ -875,15 +918,25 @@ uint8_t SGTL5000::getLineInLevelRight()
 
 
 bool SGTL5000::setDacVolumeLeft(uint8_t val)
+	// chip: 0x3C = 0db, 0xF0=-90db, 0xFC=muted
+	// we convert 0..126 to 0x3C..0xBB truncated range
+	// and explicitly set 127 to 0xFC
 {
 	display(dbg_api,"SGTL5000::setDacVolumeLeft(%d)",val);
 	uint16_t adcdac = read(CHIP_ADCDAC_CTRL);
 	uint16_t dac_mute = adcdac & (1 << 2);
 		// pull the left DAC_MUTE bit out of CHIP_ADCDAC_CTRL
 	uint16_t should_mute = val == 127 ? 0 : 1 << 2;
+
+	if (should_mute)
+		val = 0xFC;
+	val += 0x3C;
+
+	return modify(CHIP_DAC_VOL,val,0xff);
+
 	if (dac_mute != should_mute)
 		modify(CHIP_ADCDAC_CTRL,should_mute,1<<2);
-	return modify(CHIP_DAC_VOL,val,0xff);
+
 }
 bool SGTL5000::setDacVolumeRight(uint8_t val)
 {
@@ -894,15 +947,24 @@ bool SGTL5000::setDacVolumeRight(uint8_t val)
 	uint16_t should_mute = val == 127 ? 0 : 2 << 2;
 	if (dac_mute != should_mute)
 		modify(CHIP_ADCDAC_CTRL,should_mute,2<<2);
+	val += 0x3C;
+	if (should_mute)
+		val = 0xFC;
 	return modify(CHIP_DAC_VOL,val<<8,0xff00);
 }
 uint8_t SGTL5000::getDacVolumeLeft()
 {
-	return read(CHIP_DAC_VOL) & 0xff;
+	uint16_t val = read(CHIP_DAC_VOL) & 0xff;
+	if (val == 0xFC)
+		return 127;
+	return val - 0x3C;
 }
 uint8_t SGTL5000::getDacVolumeRight()
 {
-	return (read(CHIP_DAC_VOL) >> 8) & 0xff;
+	uint16_t val = (read(CHIP_DAC_VOL) >> 8) & 0xff;
+	if (val == 0xFC)
+		return 127;
+	return val - 0x3C;
 }
 
 
@@ -1062,11 +1124,13 @@ uint8_t SGTL5000::getHeadphoneVolumeRight()
 bool SGTL5000::setMuteHeadphone(uint8_t mute)
 {
 	display(dbg_api,"SGTL5000::setMuteHeadphone(%d)",mute);
+	bool rslt;
 	if (mute)
-		return write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<4));
+		rslt = write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<4));
 	else
-		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<4));
+		rslt = write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<4));
 	m_hp_muted = mute;
+	return rslt;
 }
 uint8_t SGTL5000::getMuteHeadphone()
 {
@@ -1077,11 +1141,13 @@ uint8_t SGTL5000::getMuteHeadphone()
 bool SGTL5000::setMuteLineOut(uint8_t mute)
 {
 	display(dbg_api,"SGTL5000::setMuteLineOut(%d)",mute);
+	bool rslt;
 	if (mute)
-		return write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<8));
+		rslt = write(CHIP_ANA_CTRL, m_ana_ctrl | (1<<8));
 	else
-		return write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<8));
+		rslt = write(CHIP_ANA_CTRL, m_ana_ctrl & ~(1<<8));
 	m_lineout_muted = mute;
+	return rslt;
 }
 uint8_t SGTL5000::getMuteLineOut()
 {
@@ -1619,18 +1685,16 @@ void SGTL5000::calcBiquad(uint8_t filtertype, float fC, float dB_Gain, float Q, 
 
 void SGTL5000::dumpCCValues(const char *where)
 {
-	#if DUMP_CCS
-		display(0,"dumpCCValues(%s)",where);
-		proc_entry();
-		for (uint8_t cc=SGTL_CC_BASE; cc<=SGTL_CC_MAX; cc++)
-		{
-			if (!sgtl5000_writeOnlyCC(cc))
-				getCC(cc);
-			else if (0)
-				display(0,"",0);
-		}
-		proc_leave();
-	#endif
+	display(0,"dumpCCValues(%s)",where);
+	proc_entry();
+	for (uint8_t cc=SGTL_CC_BASE; cc<=SGTL_CC_MAX; cc++)
+	{
+		if (!sgtl5000_writeOnlyCC(cc))
+			getCC(cc);
+		else if (0)
+			display(0,"",0);
+	}
+	proc_leave();
 }
 
 

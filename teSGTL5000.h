@@ -99,8 +99,8 @@ extern uint8_t sgtl5000_getCCMax(uint8_t cc);				// get the maximum value (range
 #define SGTL_CC_LINEIN_LEVEL_LEFT		35      //	15              0       		7 = middle of range
 #define SGTL_CC_LINEIN_LEVEL_RIGHT		36      //	15              0       		7
 #define SGTL_CC_DAC_VOLUME				37		//	Write Only
-#define SGTL_CC_DAC_VOLUME_LEFT			38      //	127             60      60									enable() explicitly re-sets the default value
-#define SGTL_CC_DAC_VOLUME_RIGHT		39      //	127             60      60									enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_LEFT			38      //	127             0       0									126=-63db; 127=muted; enable() explicitly re-sets the default value
+#define SGTL_CC_DAC_VOLUME_RIGHT		39      //	127             0       0									126=-63db; 127=muted; enable() explicitly re-sets the default value
 #define SGTL_CC_DAC_VOLUME_RAMP			40      //	2               1       0  									enable() enables exponential, not linear, ramping
 #define SGTL_CC_LINEOUT_LEVEL			41		//	Write Only
 #define SGTL_CC_LINEOUT_LEVEL_LEFT		42      //	31              27      2  		13 = middle of range, but	enable() explicitly sets LINE_OUT levels
