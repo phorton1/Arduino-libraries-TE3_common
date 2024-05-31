@@ -43,7 +43,14 @@ extern uint8_t tehub_getCCMax(uint8_t cc);				// get the maximum value (range) o
 #define TEHUB_CC_MIX_LOOP				35		// 0..127, 100=0db, default(100)
 #define TEHUB_CC_MIX_AUX				36		// 0..127, 100=0db, default(0 or 80 if sine is output)
 
-#define TEHUB_CC_MAX					36
+
+// following may not be supported based on defines in TE_hub.ino
+
+#define TEHUB_CC_IN_MIX_USB				37
+#define TEHUB_CC_IN_MIX_SINE			38
+
+
+#define TEHUB_CC_MAX					38
 
 
 

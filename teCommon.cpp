@@ -31,13 +31,15 @@ uint8_t tehub_getCCMax(uint8_t cc)
 {
 	switch (cc)
 	{
-		case TEHUB_CC_DUMP		: return 255;
-		case TEHUB_CC_REBOOT	: return 255;
-		case TEHUB_CC_RESET		: return 255;
-		case TEHUB_CC_MIX_IN	: return 127;
-		case TEHUB_CC_MIX_USB	: return 127;
-		case TEHUB_CC_MIX_LOOP	: return 127;
-		case TEHUB_CC_MIX_AUX	: return 127;
+		case TEHUB_CC_DUMP			: return 255;
+		case TEHUB_CC_REBOOT		: return 255;
+		case TEHUB_CC_RESET			: return 255;
+		case TEHUB_CC_MIX_IN		: return 127;
+		case TEHUB_CC_MIX_USB		: return 127;
+		case TEHUB_CC_MIX_LOOP		:	 return 127;
+		case TEHUB_CC_MIX_AUX		: return 127;
+		case TEHUB_CC_IN_MIX_USB	: return 127;
+		case TEHUB_CC_IN_MIX_SINE	: return 127;
 	}
 	return 255;
 }
@@ -48,13 +50,15 @@ const char *tehub_getCCName(uint8_t cc)
 {
 	switch (cc)
 	{
-		case TEHUB_CC_DUMP		: return "DUMP_TEHUB";
-		case TEHUB_CC_REBOOT	: return "REBOOT_TEHUB";
-		case TEHUB_CC_RESET		: return "RESET_TEHUB";
-		case TEHUB_CC_MIX_IN	: return "MIX_IN";
-		case TEHUB_CC_MIX_USB	: return "MIX_USB";
-		case TEHUB_CC_MIX_LOOP	: return "MIX_LOOP";
-		case TEHUB_CC_MIX_AUX	: return "MIX_AUX";
+		case TEHUB_CC_DUMP			: return "DUMP_TEHUB";
+		case TEHUB_CC_REBOOT		: return "REBOOT_TEHUB";
+		case TEHUB_CC_RESET			: return "RESET_TEHUB";
+		case TEHUB_CC_MIX_IN		: return "MIX_IN";
+		case TEHUB_CC_MIX_USB		: return "MIX_USB";
+		case TEHUB_CC_MIX_LOOP		: return "MIX_LOOP";
+		case TEHUB_CC_MIX_AUX		: return "MIX_AUX";
+		case TEHUB_CC_IN_MIX_USB	: return "IN_USB";
+		case TEHUB_CC_IN_MIX_SINE	: return "IN_SINE";
 	}
 	return "UNKNOWN_TEHUB_CC";
 }
