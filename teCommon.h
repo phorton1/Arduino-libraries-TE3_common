@@ -9,10 +9,10 @@
 
 // orthogonal API for getting CC descriptors
 
-#define TEHUB_CABLE 		0x0E
-	// The SGTL5000 also uses cable 0x0E
-#define TEHUB_CHANNEL		2
-	// The SGTL_5000 uses channel 1
+#define TEHUB_CABLE 		0x00	// was 0x0E
+	// The SGTL5000 also uses this cable number
+#define TEHUB_CHANNEL		14
+	// The SGTL_5000 uses channel 15
 
 extern bool tehub_writeOnlyCC(uint8_t cc);				// true if CC is writeOnly
 extern const char *tehub_getCCName(uint8_t cc);			// get the name of a CC

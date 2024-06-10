@@ -10,8 +10,8 @@
 
 #include <Arduino.h>
 
-#define SGTL5000_CABLE 		0x0E
-#define SGTL5000_CHANNEL	1
+#define SGTL5000_CABLE 		0x00	// was 0x0E
+#define SGTL5000_CHANNEL	15
 	// common to TE3 and TE3_hub
 	
 extern bool sgtl5000_writeOnlyCC(uint8_t cc);				// true if CC is writeOnly
