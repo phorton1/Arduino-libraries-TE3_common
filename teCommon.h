@@ -35,25 +35,14 @@ extern uint8_t tehub_getCCMax(uint8_t cc);				// get the maximum value (range) o
 // USB = monitor the USB in that comes back from the iPad and sent to the rpI Looper
 // LOOP = monitor what comes back from the rPi Looper which currently represents
 //		the final output of the whole system (but that might change)
-// AUX = monitor the AUX channel, which is currently only used if
-//		compile define is set to output a sine wave to that channel
+// AUX = unused
 
 #define TEHUB_CC_MIX_IN					33		// 0..127, 100=0db, default(0)
 #define TEHUB_CC_MIX_USB				34		// 0..127, 100=0db, default(0)
 #define TEHUB_CC_MIX_LOOP				35		// 0..127, 100=0db, default(100)
 #define TEHUB_CC_MIX_AUX				36		// 0..127, 100=0db, default(0 or 80 if sine is output)
 
-
-// following may not be supported based on defines in TE_hub.ino
-
-#define TEHUB_CC_IN_MIX_USB				37
-#define TEHUB_CC_IN_MIX_SINE			38
-
-
-#define TEHUB_CC_MAX					38
-
-
-
+#define TEHUB_CC_MAX					36
 
 
 // end of teCommon.h
