@@ -12,7 +12,7 @@
 
 #define SGTL5000_CABLE 		0x00	// was 0x0E
 #define SGTL5000_CHANNEL	15
-	// common to TE3 and TE3_hub
+	// common to TE3 and TE3_audio
 	
 extern bool sgtl5000_writeOnlyCC(uint8_t cc);				// true if CC is writeOnly
 extern const char *sgtl5000_getCCName(uint8_t cc);			// get the name of a CC

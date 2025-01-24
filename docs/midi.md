@@ -10,7 +10,7 @@ USB Audio and which **receives**, but generally does not transmit, **USB MIDI**.
 The iPad in this implementation *happens* to be running the MidiFire,
 AudioBus, SampleTank, and ToneStack applications which add synthesized
 sounds from SampleTank and Guitar effects from ToneStack to the incoming
-USB Audio stream and send the modified audio stream back to the TE3_hub
+USB Audio stream and send the modified audio stream back to the TE3_audio
 via the USB connection.  This discussion is focused on the Serial Text
 and MIDI in the system so does not show the Audio flow.  However, it
 is useful to understand *why* we need to send MIDI to the iPad - in order
@@ -19,14 +19,14 @@ to play the synthesizer and control the guitar effects.
 ![diagram](images/Diagram2_midi.jpg)
 
 **FTP** is an acronym for the Fishman Triple Play synthesizer pickup.
-The FTP **Dongle** is plugged into the USB Host port on the TE3_hub.
+The FTP **Dongle** is plugged into the USB Host port on the TE3_audio.
 The FTP both transmits and receives USB MIDI over the USB Host port.
 
-The **TE3_hub** is the **teensy4.0** USB Audio and MIDI device for the
+The **TE3_audio** is the **teensy4.0** USB Audio and MIDI device for the
 vGuitar system. It attaches to the iPad via a USB cable and transmits
-USB Midi to it. The TE3_hub also has the **USB Host** into which the
-FTP Dongle is plugged. Finally, the TE3_hub is connected to the TE3
-via a bidirectional Serial port.  The TE3_hub
+USB Midi to it. The TE3_audio also has the **USB Host** into which the
+FTP Dongle is plugged. Finally, the TE3_audio is connected to the TE3
+via a bidirectional Serial port.  The TE3_audio
 receives *pure Serial MIDI* from the TE3 and sends *embedded
 Serial MIDI* to it.
 
@@ -35,7 +35,7 @@ The Looper processes audio data from that came into the TE3 over
 the USB Audio interface from the iPad and was sent to it via the
 I2S protocol.  The Looper records tracks and/or mixes previously
 recorded tracks (loops) back into the Audio data stream before
-sending it back to the TE3_hub over I2s.  The Looper is controlled
+sending it back to the TE3_audio over I2s.  The Looper is controlled
 and monitored via a bidirectional Serial port to the TE3 device.
 It sends embedded Serial Midi and debugging text to the TE3 device,
 and receives embedded Serial Midi from the the TE3. Although
@@ -47,7 +47,7 @@ is used to upload new Looper firmware (kernel.img files) to the rPi.
 The **TE3** is the main program that represents the *Foot Pedal* portion
 of the vGuitar system.  It can be connected to a Laptop or other
 computer over a USB cable.  It knows how to route Serial data
-between the Laptop, Looper, TE3_hub, and itself, which not only
+between the Laptop, Looper, TE3_audio, and itself, which not only
 includes Serial MIDI data, but also includes a number of other
 protocols including binary and text file transfer protocols,
 as well as knowing how to forwared debugging text output from all
@@ -106,7 +106,7 @@ would allow for 16 different virtual "cables" to be addressed by the
 new 4-byte packet. These "cables" are also variously known as MIDI ports,
 and (in MS Windows terminology) as separate "devices".
 
-Thus when you plug the TE3_hub into your computer, you will see not one,
+Thus when you plug the TE3_audio into your computer, you will see not one,
 but a whole list of devices:
 
 - a bi-directional Serial Port (i.e. COM14)
@@ -120,22 +120,22 @@ play on the guitar as MIDI message) and the other cable/device represents
 the "control" device that includes things like Volume, Tuning, Patch
 management, and so on.
 
-So, when the TE3_hub finally gets around to sending USB MIDI messages
+So, when the TE3_audio finally gets around to sending USB MIDI messages
 to the iPad, it needs to keep the messages from the FTP separate
 from those from the TE3 (Foot Pedal), and so on.
 
-That is why the TE3_hub must be able to receive "pure" Serial MIDI
+That is why the TE3_audio must be able to receive "pure" Serial MIDI
 messages.  Not only does it need to forward TE3 expression pedal,
 button press, and rotary control messages to the iPad, but in fact
-the TE3_hub itself is configured and controlled via that same
+the TE3_audio itself is configured and controlled via that same
 Serial MIDI cable. It's not clear from the above diagram or thus
-far in this discussion, but the TE3_hub is also an **analog audio
+far in this discussion, but the TE3_audio is also an **analog audio
 device**.  That is, it takes analog input from the guitar (or a typical
 line level audio device) as an input, and in the end, it outputs
 sound as an line level output (or headphone jack) to an amplifier.
 It has a pretty extensive set of controls for that purpose, including
 adjusting the input and output levels, tone controls, and so on.
-So the TE3_hub will "intercept" some MIDI messages sent to it
+So the TE3_audio will "intercept" some MIDI messages sent to it
 from the TE3 and will act on those messages to change it's
 parameters.
 
@@ -148,22 +148,22 @@ I am going to re-include the above diagram here so that you don't have to
 scroll up and down to see what I am talking about.
 
 
-### (1) USB MIDI from TE3_hub to the iPad
+### (1) USB MIDI from TE3_audio to the iPad
 
-The TE3_hub sends standard USB MIDI to the iPad. It is a one way connection;
-the TE3_hub does not receive any USB MIDI from the iPad.  In doing so
-the TE3_hub can appear as more than one MIDI device (port/cable) to the
+The TE3_audio sends standard USB MIDI to the iPad. It is a one way connection;
+the TE3_audio does not receive any USB MIDI from the iPad.  In doing so
+the TE3_audio can appear as more than one MIDI device (port/cable) to the
 iPad. There are 16 available, but I only envision using four.
 
 - **teensyExpression1** - messages from the TE3 Foot Pedal to the iPad
 - **teensyExpression2** - an optional second, separate device, for
   routing specific messages from different parts of the TE3
   Foot Pedal to the iPad on different cable numbers
-- **Fishman Triple Play** - performance data that the TE3_hub gets
+- **Fishman Triple Play** - performance data that the TE3_audio gets
   from the FTP dongle via the USB Host port is generally sent to
   the iPad unchanged.
 - **FTP Control** - is not generally used by the iPad, but can be
-  used when the TE3_hub is plugged directly into the laptop for
+  used when the TE3_audio is plugged directly into the laptop for
   development and debugging. This involves the concept of
   **FTP Spoofing** which will likely be discussed elsewhere.
 
@@ -176,7 +176,7 @@ However, it is way more complicated than it would first seem.
 
 In general, as mentioned before, performance data from the FTP
 is sent to the iPad over USB MIDI in order to trigger the synthesizer
-to make sounds.  Therefore, in a time critical manner, the TE3_hub
+to make sounds.  Therefore, in a time critical manner, the TE3_audio
 must get that FTP performance data from the Host port and forward it
 out of the USB port to the iPad.
 
@@ -187,7 +187,7 @@ a guitar Tuner and to adjust the FTP's per-guitar-string
 senstivity settings.  To accomplish these functions the FTP
 must be set into special "modes" with some fairly complicated
 exchanges of MIDI messages.  Then, for instance, using the
-guitar tuner functionality as an example, the TE3_hub needs
+guitar tuner functionality as an example, the TE3_audio needs
 to keep track of MIDI note-on and note-off messages and communicate
 those changes to the TE3 Foot Pedal (portion of the system).
 
@@ -195,54 +195,54 @@ Therefore, those note-on and note-off messages have to go BOTH
 to the iPad (as they are performance data) and to the TE3
 as they represent the notes being played during a tuning session.
 
-Therefore the TE3_hub (program) is initimately aware of the FTP
+Therefore the TE3_audio (program) is initimately aware of the FTP
 and its state and knowledgable that certain messages must be sent
 to initalize the FTP, to set it into certain modes, and so on.
 As of this writing it is not clear how much of that will be
-"built into" the TE3_hub program, and how much can be put off
+"built into" the TE3_audio program, and how much can be put off
 on the TE3 program and handled via (pure and/or embeded) Serial
 MIDI
 
 In addition, there is another possibility that will likely be
-built into the TE3_hub around the FTP that makes it even more
+built into the TE3_audio around the FTP that makes it even more
 complicated.  It is possible that the FTP will NOT be plugged
-directly into the TE3_hub, but instead the TE3_hub itself will
+directly into the TE3_audio, but instead the TE3_audio itself will
 be plugged into "regular" USB HUB that will be plugged into the
 iPad, and the FTP Dongle will be inserted into the regular
 USB Hub.  That's the way it worked (best) in TE1 and TE2, and
-I may need to build that into TE3 (and TE3_hub).
+I may need to build that into TE3 (and TE3_audio).
 
 ![diagram](images/Diagram2_midi.jpg)
 
-### (3) Pure Serial MIDI from TE3 to TE3_hub
+### (3) Pure Serial MIDI from TE3 to TE3_audio
 
 There is no currently known requirement to send any text
-or other protocols from the TE3 to the TE3_hub.
+or other protocols from the TE3 to the TE3_audio.
 
-Therefore the TE3_hub can take advantage of the full
+Therefore the TE3_audio can take advantage of the full
 capabilities (cable numbers) available with full Serial
 MIDI.
 
 It is envisioned that one cable number (i.e. 15, zero based)
-will be dedicated to messsages intended FOR the TE3_hub which
+will be dedicated to messsages intended FOR the TE3_audio which
 are used to control the SGTL5000 (audio codec chip) via MIDI.
 
 A second cable number (i.e. 14) *may* be used for messages
-directly to the TE3_hub for FTP related functionality.
+directly to the TE3_audio for FTP related functionality.
 Possibilities include:
 
-- Toggling the FTP (and TE3_hub) "FTP Tuning Mode"
-- Toggling the FTP (and TE3_hub) "FTP Sensitivity Mode"
+- Toggling the FTP (and TE3_audio) "FTP Tuning Mode"
+- Toggling the FTP (and TE3_audio) "FTP Sensitivity Mode"
 - Specifying whether the FTP is connected to the Host Port or
 to an external USB hub
-- Specifying whether the TE3_hub is in "FTP Spoof" mode.
+- Specifying whether the TE3_audio is in "FTP Spoof" mode.
 - Specifying where to send debugging text (MAIN USB versus
   the Serial port)
 
-### (4) embedded Serial Midi from TE3_hub to TE3
+### (4) embedded Serial Midi from TE3_audio to TE3
 
 The reason that this needs to be embedded, rather than
-pure Serial MIDI is because the TE3_hub has the option
+pure Serial MIDI is because the TE3_audio has the option
 of sending it's debugging text messages out over the
 same serial port as is used for Serial MIDI messages
 to the TE3.
@@ -250,7 +250,7 @@ to the TE3.
 The lack of a cable number may be non-trivial, because
 in practice the FTP uses almost all MIDI channel numbers,
 and in addition to communicating it's state to the TE3,
-TE3_hub must also communicate it's own state, as well
+TE3_audio must also communicate it's own state, as well
 as the state of the SGTL5000 audio codec chip.
 
 It may require significant careful work to do all of
@@ -279,7 +279,7 @@ However the TE3 side still needs to be designed and implemented.
 The TE3 side *largely* involves moving the guts of the previous
 **teensyPiLooper** program into the TE3 repository. However, in
 the teensyPiLooper program the TE2 was a separate serial device,
-and the TE3_hub did not exist.
+and the TE3_audio did not exist.
 
 Therefore the enquing, routing, and dispatching of Serial MIDI
 messages, including both "pure" and "embedded" versions needs
@@ -345,7 +345,7 @@ for end users to configure.
 That's about it for this writing.  I need to start writing some
 code and trying to tie some of these pieces together.
 
-As of this writing I have build the TE3_hub and tested the
+As of this writing I have build the TE3_audio and tested the
 SGTL5000 teensy Audio shield RevD, and done basic testing of
 the MIDI Host Port.
 
@@ -388,7 +388,7 @@ ANY of the 4 big USB ports or ethernet port.
 
 I may be able to put it all on a single circuit board,
 eliminating almost all wired interconnections between
-processors (between TE3, TE3_hub, and the rPi looper)!
+processors (between TE3, TE3_audio, and the rPi looper)!
 
 More later ....
 
@@ -398,7 +398,7 @@ More later ....
 
 ## Please also see
 
-[**TE3_hub**](https://github.com/phorton1/Arduino-TE3_hub)
+[**TE3_audio**](https://github.com/phorton1/Arduino-TE3_audio)
 The parent **USB Audio and MIDI interface** with a **USB Host** port
 for the vGuitar System.
 
