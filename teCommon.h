@@ -8,9 +8,14 @@
 #include <Arduino.h>
 
 // orthogonal API for getting CC descriptors
+// Note that the port numbers are different between
+// TE3, which has 8 midi ports, and TE3_audio which
+// has only one input serial midi port.
+//
+// TE3_audio differentiates messages for the SGTL
+// from those for itself by use of the following
+// define.
 
-#define AUDIO_CABLE 		0x00	// was 0x0E
-	// The SGTL5000 also uses this cable number
 #define AUDIO_CHANNEL		14
 	// The SGTL_5000 uses channel 15
 
